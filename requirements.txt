@@ -1,5 +1,6 @@
-streamlit>=1.38
+streamlit>=1.42
 pandas>=2.0
-requests>=2.31
+gspread>=6.1
+google-auth>=2.30
 altair>=5.0
 streamlit-autorefresh>=1.0.1
