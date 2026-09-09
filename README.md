@@ -1,44 +1,29 @@
-# Rider Gate Staff Performance Dashboard V8 — Streamlit + Apps Script
+# Rider Gate Staff Performance Dashboard V9 — Streamlit + Apps Script
 
-V8 replaces the login layout implementation.
+V9 adds the map background behind the main dashboard content.
 
-## Login fix
+## What's added
 
-The previous login versions tried to position Streamlit's entire `main`
-element at `left: 50vw`. That was unreliable because Streamlit's internal
-wrappers still applied their own layout calculations.
+- The uploaded map image is now included in `assets/dashboard_map_bg.png`.
+- The main dashboard area uses the map as a background layer behind the content.
+- The Rider Gate sidebar is unaffected.
+- The login page is unaffected.
+- KPI cards, tables and dealer trend cards remain readable with a soft white overlay and slight translucency.
 
-V8 removes that approach completely.
+## Notes
 
-The login page is now created using two actual Streamlit columns:
-
-- Left column: 50% Rider Gate red panel
-- Right column: 50% login area
-- The row is full viewport height
-- Streamlit's `vertical_alignment="center"` centres the right-side content
-- The right-side content is constrained to a 460px form block and horizontally
-  centred inside the right column
-
-There is no fixed right-side `main` positioning and no `left:50vw` hack.
-
-## Other V7 fixes retained
-
-- Sidebar can collapse and reopen
-- Sales and Bike Listing dealer tabs
-- Sales chart fix
-- Full Date / Sales / Bike Listings hover details
-- No NaN chart values
-- Malaysia timezone
-- Private sheets via Apps Script
+- The background is applied only to the dashboard main content area.
+- No Apps Script changes are required.
+- No Streamlit Secrets changes are required.
 
 ## Update GitHub using CMD
 
-Replace the existing project files with V8 while keeping your `.git` folder:
+Replace the current project files with V9 while keeping your `.git` folder:
 
 ```cmd
 git add .
-git commit -m "Fix login layout V8"
+git commit -m "Add dashboard map background V9"
 git push
 ```
 
-No Apps Script or Streamlit Secrets changes are required.
+Streamlit should redeploy automatically.

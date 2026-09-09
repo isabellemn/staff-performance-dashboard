@@ -29,10 +29,20 @@ LIGHT_BG = "#F6F8FB"
 GRID = "#E8EBF0"
 
 
+MAP_BG_PATH = ROOT / "assets" / "dashboard_map_bg.png"
+
+
 def logo_data_uri() -> str:
     if not LOGO_PATH.exists():
         return ""
     encoded = base64.b64encode(LOGO_PATH.read_bytes()).decode("utf-8")
+    return f"data:image/png;base64,{encoded}"
+
+
+def map_bg_data_uri() -> str:
+    if not MAP_BG_PATH.exists():
+        return ""
+    encoded = base64.b64encode(MAP_BG_PATH.read_bytes()).decode("utf-8")
     return f"data:image/png;base64,{encoded}"
 
 
@@ -311,6 +321,37 @@ def inject_login_css():
 
 
 def inject_dashboard_css():
+    map_bg = map_bg_data_uri()
+
+    if map_bg:
+        background_css = f"""
+        main[data-testid="stMain"]::before {{
+            content:"";
+            position:fixed;
+            inset:0 0 0 auto;
+            left:0;
+            right:0;
+            top:0;
+            bottom:0;
+            background-image:
+                linear-gradient(rgba(246,248,251,.90), rgba(246,248,251,.90)),
+                url('{map_bg}');
+            background-repeat:no-repeat, repeat;
+            background-position:center center, center top;
+            background-size:cover, 1400px auto;
+            opacity:1;
+            pointer-events:none;
+            z-index:0;
+        }}
+
+        main[data-testid="stMain"] > div {{
+            position:relative;
+            z-index:1;
+        }}
+        """
+    else:
+        background_css = ""
+
     st.markdown(
         f"""
         <style>
@@ -323,6 +364,13 @@ def inject_dashboard_css():
         .stApp {{
             background:{LIGHT_BG};
         }}
+
+        main[data-testid="stMain"] {{
+            position:relative !important;
+            background:transparent !important;
+        }}
+
+        {background_css}
 
         /* Critical: the dashboard now uses the entire available width.
            When the sidebar is collapsed, the content expands with it. */
@@ -449,15 +497,11 @@ def inject_dashboard_css():
             pointer-events:auto !important;
         }}
 
-        /* The native icon points left. Rotate it while collapsed so the
-           remaining button clearly means "open sidebar". */
         section[data-testid="stSidebar"][aria-expanded="false"]
         [data-testid="stSidebarCollapseButton"] svg {{
             transform:rotate(180deg) !important;
         }}
 
-        /* Give the open-arrow a little breathing room without sacrificing
-           the full-width dashboard layout. */
         section[data-testid="stSidebar"][aria-expanded="false"] ~
         main[data-testid="stMain"] .block-container {{
             padding-left:4.6rem !important;
@@ -545,7 +589,6 @@ def inject_dashboard_css():
             white-space:nowrap;
         }}
 
-        /* Normal dashboard action buttons */
         main div[data-testid="stButton"] button {{
             background:#FFFFFF;
             color:{INK};
@@ -565,7 +608,8 @@ def inject_dashboard_css():
         }}
 
         .kpi-card {{
-            background:#FFFFFF;
+            background:rgba(255,255,255,.90);
+            backdrop-filter: blur(1.5px);
             border:1px solid #E7EAF0;
             border-radius:16px;
             padding:18px 20px;
@@ -675,7 +719,7 @@ def inject_dashboard_css():
             border:1px solid #E8EBF0 !important;
             border-radius:16px !important;
             background:
-                linear-gradient(rgba(255,255,255,.97),rgba(255,255,255,.97)),
+                linear-gradient(rgba(255,255,255,.96),rgba(255,255,255,.96)),
                 repeating-linear-gradient(135deg,#F1F3F6 0,#F1F3F6 1px,transparent 1px,transparent 13px) !important;
             box-shadow:0 8px 25px rgba(32,41,56,.04);
         }}
@@ -684,11 +728,13 @@ def inject_dashboard_css():
             border-radius:14px;
             overflow:hidden;
             border:1px solid #E7EAF0;
+            background:rgba(255,255,255,.96);
+            backdrop-filter: blur(1.5px);
         }}
 
         div[data-testid="stDateInput"] input,
         div[data-testid="stTextInput"] input {{
-            background:#FFFFFF;
+            background:rgba(255,255,255,.96);
             border-radius:10px;
             border:1px solid #DDE1E7;
             min-height:40px;
