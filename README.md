@@ -1,29 +1,28 @@
-# Rider Gate Staff Performance Dashboard V9 — Streamlit + Apps Script
+# Rider Gate Staff Performance Dashboard V10 — Streamlit + Apps Script
 
-V9 adds the map background behind the main dashboard content.
+V10 fixes the map background visibility.
 
-## What's added
+## Why V9 looked blank
 
-- The uploaded map image is now included in `assets/dashboard_map_bg.png`.
-- The main dashboard area uses the map as a background layer behind the content.
-- The Rider Gate sidebar is unaffected.
-- The login page is unaffected.
-- KPI cards, tables and dealer trend cards remain readable with a soft white overlay and slight translucency.
+The supplied map image is already very light. V9 added another 90% white wash
+over it, so the road lines were almost invisible.
 
-## Notes
+## V10
 
-- The background is applied only to the dashboard main content area.
-- No Apps Script changes are required.
-- No Streamlit Secrets changes are required.
+- Removes the white wash completely.
+- Applies the map directly to the main dashboard area.
+- Forces Streamlit's main content wrappers to remain transparent.
+- Repeats the map vertically so it continues as you scroll.
+- Scales the map to the dashboard width.
+- Leaves the Rider Gate sidebar and login page unchanged.
+- Keeps cards and tables mostly white so the data remains easy to read.
 
-## Update GitHub using CMD
-
-Replace the current project files with V9 while keeping your `.git` folder:
+## Update GitHub with CMD
 
 ```cmd
 git add .
-git commit -m "Add dashboard map background V9"
+git commit -m "Make dashboard map background visible V10"
 git push
 ```
 
-Streamlit should redeploy automatically.
+No Apps Script or Streamlit Secrets changes are required.

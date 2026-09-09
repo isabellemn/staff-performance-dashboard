@@ -325,28 +325,22 @@ def inject_dashboard_css():
 
     if map_bg:
         background_css = f"""
-        main[data-testid="stMain"]::before {{
-            content:"";
-            position:fixed;
-            inset:0 0 0 auto;
-            left:0;
-            right:0;
-            top:0;
-            bottom:0;
-            background-image:
-                linear-gradient(rgba(246,248,251,.90), rgba(246,248,251,.90)),
-                url('{map_bg}');
-            background-repeat:no-repeat, repeat;
-            background-position:center center, center top;
-            background-size:cover, 1400px auto;
-            opacity:1;
-            pointer-events:none;
-            z-index:0;
+        /* Apply the uploaded map directly to the dashboard main area.
+           The image is already pale, so no heavy white overlay is used. */
+        main[data-testid="stMain"] {{
+            background-color:#F7F8FA !important;
+            background-image:url('{map_bg}') !important;
+            background-repeat:repeat-y !important;
+            background-position:center top !important;
+            background-size:100% auto !important;
+            background-attachment:local !important;
         }}
 
-        main[data-testid="stMain"] > div {{
-            position:relative;
-            z-index:1;
+        /* Streamlit wrappers must stay transparent or they will hide the map. */
+        main[data-testid="stMain"] > div,
+        main[data-testid="stMain"] [data-testid="stMainBlockContainer"],
+        main[data-testid="stMain"] .block-container {{
+            background:transparent !important;
         }}
         """
     else:
@@ -367,7 +361,6 @@ def inject_dashboard_css():
 
         main[data-testid="stMain"] {{
             position:relative !important;
-            background:transparent !important;
         }}
 
         {background_css}
@@ -608,7 +601,7 @@ def inject_dashboard_css():
         }}
 
         .kpi-card {{
-            background:rgba(255,255,255,.90);
+            background:rgba(255,255,255,.92);
             backdrop-filter: blur(1.5px);
             border:1px solid #E7EAF0;
             border-radius:16px;
@@ -719,7 +712,7 @@ def inject_dashboard_css():
             border:1px solid #E8EBF0 !important;
             border-radius:16px !important;
             background:
-                linear-gradient(rgba(255,255,255,.96),rgba(255,255,255,.96)),
+                linear-gradient(rgba(255,255,255,.93),rgba(255,255,255,.93)),
                 repeating-linear-gradient(135deg,#F1F3F6 0,#F1F3F6 1px,transparent 1px,transparent 13px) !important;
             box-shadow:0 8px 25px rgba(32,41,56,.04);
         }}
@@ -728,13 +721,13 @@ def inject_dashboard_css():
             border-radius:14px;
             overflow:hidden;
             border:1px solid #E7EAF0;
-            background:rgba(255,255,255,.96);
+            background:rgba(255,255,255,.94);
             backdrop-filter: blur(1.5px);
         }}
 
         div[data-testid="stDateInput"] input,
         div[data-testid="stTextInput"] input {{
-            background:rgba(255,255,255,.96);
+            background:rgba(255,255,255,.94);
             border-radius:10px;
             border:1px solid #DDE1E7;
             min-height:40px;
