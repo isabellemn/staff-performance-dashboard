@@ -96,55 +96,45 @@ def inject_login_css():
             display:none !important;
         }}
 
-        /* LOGIN LAYOUT
-           The main Streamlit area itself is now exactly the right half of
-           the viewport. The login content is then centred inside that half,
-           so its position no longer depends on Streamlit wrapper widths. */
-        main[data-testid="stMain"] {{
-            position:fixed !important;
-            top:0 !important;
-            right:0 !important;
-            bottom:0 !important;
-            left:50vw !important;
-            width:50vw !important;
-            height:100vh !important;
+        /* LOGIN LAYOUT - V8
+           No fixed positioning and no 50vw offset hacks.
+           The page is built from two real Streamlit columns. */
+        .block-container,
+        [data-testid="stMainBlockContainer"] {{
+            width:100vw !important;
+            max-width:100vw !important;
             min-height:100vh !important;
             margin:0 !important;
             padding:0 !important;
-            display:grid !important;
-            place-items:center !important;
-            overflow:auto !important;
+        }}
+
+        main[data-testid="stMain"] {{
+            width:100% !important;
+            min-height:100vh !important;
+            margin:0 !important;
+            padding:0 !important;
             background:#FFFFFF !important;
         }}
 
-        main[data-testid="stMain"] .block-container,
-        [data-testid="stMainBlockContainer"] {{
-            position:static !important;
-            inset:auto !important;
-            transform:none !important;
-            box-sizing:border-box !important;
-            width:min(460px, calc(100% - 72px)) !important;
-            max-width:460px !important;
-            min-height:0 !important;
-            margin:0 auto !important;
+        /* The first horizontal block on the login page is the 50/50 layout. */
+        [data-testid="stHorizontalBlock"] {{
+            gap:0 !important;
+            min-height:100vh !important;
+            align-items:center !important;
+        }}
+
+        [data-testid="stHorizontalBlock"] > [data-testid="stColumn"],
+        [data-testid="stHorizontalBlock"] > [data-testid="column"] {{
             padding:0 !important;
-            display:block !important;
-            overflow:visible !important;
+            margin:0 !important;
+            min-width:0 !important;
         }}
 
-        main[data-testid="stMain"] .block-container > div,
-        [data-testid="stMainBlockContainer"] > div {{
-            width:100% !important;
-            max-width:460px !important;
-            margin-left:auto !important;
-            margin-right:auto !important;
-        }}
-
+        /* Left panel */
         .login-hero {{
-            position:fixed;
-            inset:0 auto 0 0;
-            width:50vw;
-            height:100vh;
+            width:100%;
+            min-height:100vh;
+            box-sizing:border-box;
             overflow:hidden;
             background:
                 radial-gradient(circle at 12% 16%, rgba(255,255,255,.12) 0 90px, transparent 91px),
@@ -153,15 +143,13 @@ def inject_login_css():
             color:#FFFFFF;
             padding:clamp(54px,7vw,110px);
             display:flex;
-            flex-direction:column;
-            justify-content:center;
-            z-index:2;
+            align-items:center;
         }}
 
         .login-hero-inner {{
+            width:100%;
             max-width:580px;
-            position:relative;
-            z-index:3;
+            margin:0 auto;
         }}
 
         .login-logo {{
@@ -198,10 +186,26 @@ def inject_login_css():
             color:rgba(255,255,255,.82);
         }}
 
+        /* Right column:
+           constrain its complete vertical block to 460px and centre it.
+           Support both current and older Streamlit test-id names. */
+        [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(2) > div,
+        [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2) > div {{
+            width:100% !important;
+            max-width:460px !important;
+            margin-left:auto !important;
+            margin-right:auto !important;
+        }}
+
+        [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(2),
+        [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2) {{
+            box-sizing:border-box !important;
+            padding:48px clamp(42px,5vw,82px) !important;
+        }}
+
         .login-form-title {{
             width:100%;
-            max-width:460px;
-            margin:0 auto 5px;
+            margin:0 0 5px;
             font-size:28px;
             font-weight:800;
             letter-spacing:-.6px;
@@ -210,8 +214,7 @@ def inject_login_css():
 
         .login-form-subtitle {{
             width:100%;
-            max-width:460px;
-            margin:0 auto 28px;
+            margin:0 0 28px;
             color:{MUTED};
             font-size:12px;
             line-height:1.6;
@@ -220,7 +223,7 @@ def inject_login_css():
         div[data-testid="stForm"] {{
             width:100% !important;
             max-width:460px !important;
-            margin:0 auto !important;
+            margin:0 !important;
             padding:0 !important;
             border:0 !important;
         }}
@@ -263,17 +266,18 @@ def inject_login_css():
 
         .login-hint {{
             width:100%;
-            max-width:460px;
-            margin:16px auto 0;
+            margin:16px 0 0;
             font-size:10px;
             color:#9AA1AD;
         }}
 
         @media (max-width:800px) {{
+            [data-testid="stHorizontalBlock"] {{
+                display:block !important;
+                min-height:0 !important;
+            }}
+
             .login-hero {{
-                position:relative;
-                width:100vw;
-                height:auto;
                 min-height:42vh;
                 padding:38px 28px;
             }}
@@ -287,22 +291,17 @@ def inject_login_css():
                 font-size:31px;
             }}
 
-            main[data-testid="stMain"] {{
-                position:relative !important;
-                inset:auto !important;
-                width:100vw !important;
-                height:auto !important;
+            [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(2),
+            [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2) {{
                 min-height:58vh !important;
-                display:block !important;
+                padding:46px 28px !important;
+                display:flex !important;
+                align-items:center !important;
             }}
 
-            main[data-testid="stMain"] .block-container,
-            [data-testid="stMainBlockContainer"] {{
-                width:100% !important;
+            [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(2) > div,
+            [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2) > div {{
                 max-width:520px !important;
-                min-height:0 !important;
-                margin:0 auto !important;
-                padding:46px 28px !important;
             }}
         }}
         </style>
@@ -722,57 +721,83 @@ def login_screen():
     inject_login_css()
 
     logo = logo_data_uri()
-    logo_html = f'<img class="login-logo" src="{logo}" alt="Rider Gate logo">' if logo else ""
+    logo_html = (
+        f'<img class="login-logo" src="{logo}" alt="Rider Gate logo">'
+        if logo
+        else ""
+    )
 
-    st.markdown(
-        f"""
-        <div class="login-hero">
-            <div class="login-hero-inner">
-                {logo_html}
-                <div class="login-eyebrow">Rider Gate</div>
-                <h1>Staff Performance<br>Dashboard</h1>
-                <p>
-                    Access dealer visits, bike listings and staff sales performance
-                    in one secure dashboard.
-                </p>
+    # Use two genuine 50/50 Streamlit columns. The left panel has a full
+    # viewport-height hero, which makes the row 100vh. vertical_alignment
+    # then centres the right-hand login content within that same height.
+    left_col, right_col = st.columns(
+        [1, 1],
+        gap=None,
+        vertical_alignment="center",
+    )
+
+    with left_col:
+        st.markdown(
+            f"""
+            <div class="login-hero">
+                <div class="login-hero-inner">
+                    {logo_html}
+                    <div class="login-eyebrow">Rider Gate</div>
+                    <h1>Staff Performance<br>Dashboard</h1>
+                    <p>
+                        Access dealer visits, bike listings and staff sales
+                        performance in one secure dashboard.
+                    </p>
+                </div>
             </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    st.markdown('<div class="login-form-title">Dashboard Login</div>', unsafe_allow_html=True)
-    st.markdown(
-        '<div class="login-form-subtitle">Enter your password to access the staff performance dashboard.</div>',
-        unsafe_allow_html=True,
-    )
-
-    with st.form("login_form", clear_on_submit=False):
-        password = st.text_input(
-            "Password",
-            type="password",
-            placeholder="Enter password",
+            """,
+            unsafe_allow_html=True,
         )
-        submitted = st.form_submit_button("Login", use_container_width=True)
 
-    if submitted:
-        expected = get_app_password()
-        if not expected:
-            st.error("The dashboard password has not been configured in Streamlit Secrets.")
-        elif hmac.compare_digest(password, expected):
-            st.session_state["authenticated"] = True
-            st.session_state["login_error"] = False
-            st.rerun()
-        else:
-            st.session_state["login_error"] = True
+    with right_col:
+        st.markdown(
+            '<div class="login-form-title">Dashboard Login</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            '<div class="login-form-subtitle">'
+            'Enter your password to access the staff performance dashboard.'
+            '</div>',
+            unsafe_allow_html=True,
+        )
 
-    if st.session_state.get("login_error"):
-        st.error("Incorrect password.")
+        with st.form("login_form", clear_on_submit=False):
+            password = st.text_input(
+                "Password",
+                type="password",
+                placeholder="Enter password",
+            )
+            submitted = st.form_submit_button(
+                "Login",
+                use_container_width=True,
+            )
 
-    st.markdown(
-        '<div class="login-hint">Authorised Rider Gate users only.</div>',
-        unsafe_allow_html=True,
-    )
+        if submitted:
+            expected = get_app_password()
+            if not expected:
+                st.error(
+                    "The dashboard password has not been configured "
+                    "in Streamlit Secrets."
+                )
+            elif hmac.compare_digest(password, expected):
+                st.session_state["authenticated"] = True
+                st.session_state["login_error"] = False
+                st.rerun()
+            else:
+                st.session_state["login_error"] = True
+
+        if st.session_state.get("login_error"):
+            st.error("Incorrect password.")
+
+        st.markdown(
+            '<div class="login-hint">Authorised Rider Gate users only.</div>',
+            unsafe_allow_html=True,
+        )
 
 
 def data_api_configuration():

@@ -1,50 +1,44 @@
-# Rider Gate Staff Performance Dashboard V7 - Streamlit + Apps Script
+# Rider Gate Staff Performance Dashboard V8 — Streamlit + Apps Script
 
-V7 fixes the four issues reported after V6.
+V8 replaces the login layout implementation.
 
-## Fixed in V7
+## Login fix
 
-1. Login form centring
-   - The Streamlit main area is explicitly constrained to the right 50% of the viewport.
-   - The complete login block is centred inside that half, horizontally and vertically.
+The previous login versions tried to position Streamlit's entire `main`
+element at `left: 50vw`. That was unreliable because Streamlit's internal
+wrappers still applied their own layout calculations.
 
-2. Sidebar can always be reopened
-   - V6 targeted an obsolete collapsed-control selector.
-   - V7 uses Streamlit's current `stSidebarCollapseButton`.
-   - When the sidebar is collapsed, only a small transparent fixed rail and a white circular reopen arrow remain.
-   - The rail is fixed/overlaid, so it does not take width away from the dashboard.
-   - The dashboard still expands to the available full width.
+V8 removes that approach completely.
 
-3. Sales graph fixed
-   - The source column name `No. of Sales` contains periods.
-   - Altair/Vega-Lite can interpret periods in field names as nested data paths.
-   - V7 uses safe internal plotting fields: `Sales` and `BikeListings`.
-   - The Sales tab now plots Sales correctly.
+The login page is now created using two actual Streamlit columns:
 
-4. No more Sales NaN on hover
-   - Sales and bike-listing values are normalised before charting.
-   - Blanks, N/A-style values and non-numeric values are converted to 0.
-   - Hover details use safe plotting field names.
-   - Both Sales and Bike Listing tabs show Date, Sales and Bike listings on hover.
+- Left column: 50% Rider Gate red panel
+- Right column: 50% login area
+- The row is full viewport height
+- Streamlit's `vertical_alignment="center"` centres the right-side content
+- The right-side content is constrained to a 460px form block and horizontally
+  centred inside the right column
 
-## Apps Script
+There is no fixed right-side `main` positioning and no `left:50vw` hack.
 
-No Apps Script change or redeployment is required.
+## Other V7 fixes retained
 
-## Streamlit Secrets
+- Sidebar can collapse and reopen
+- Sales and Bike Listing dealer tabs
+- Sales chart fix
+- Full Date / Sales / Bike Listings hover details
+- No NaN chart values
+- Malaysia timezone
+- Private sheets via Apps Script
 
-Keep your existing secrets unchanged.
+## Update GitHub using CMD
 
-## Update GitHub with CMD
-
-Replace the old project files with V7 while keeping the existing `.git` folder.
-
-Then run:
+Replace the existing project files with V8 while keeping your `.git` folder:
 
 ```cmd
 git add .
-git commit -m "Fix login sidebar and dealer sales charts V7"
+git commit -m "Fix login layout V8"
 git push
 ```
 
-Streamlit should redeploy automatically.
+No Apps Script or Streamlit Secrets changes are required.
