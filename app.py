@@ -39,46 +39,26 @@ def logo_data_uri() -> str:
 def hide_streamlit_chrome(keep_sidebar_toggle=False):
     if keep_sidebar_toggle:
         header_css = """
+        /* Keep the Streamlit header available because sidebar state is
+           managed by Streamlit itself, but hide the unrelated controls. */
         header[data-testid="stHeader"] {
             display:block !important;
             background:transparent !important;
-            height:0 !important;
-            min-height:0 !important;
+            height:3.25rem !important;
+            min-height:3.25rem !important;
             pointer-events:none !important;
-        }
-
-        /* Keep only Streamlit's native sidebar reopen arrow accessible
-           after the sidebar has been collapsed. */
-        [data-testid="stSidebarCollapsedControl"] {
-            display:flex !important;
-            position:fixed !important;
-            top:16px !important;
-            left:16px !important;
-            z-index:1000000 !important;
-            pointer-events:auto !important;
-        }
-
-        [data-testid="stSidebarCollapsedControl"] button {
-            width:42px !important;
-            height:42px !important;
-            min-width:42px !important;
-            border-radius:999px !important;
-            border:1px solid #E4E7EC !important;
-            background:#FFFFFF !important;
-            color:#B52F25 !important;
-            box-shadow:0 6px 18px rgba(32,41,56,.12) !important;
         }
 
         [data-testid="stToolbar"],
         [data-testid="stHeaderActionElements"],
-        [data-testid="stStatusWidget"] {
+        [data-testid="stStatusWidget"],
+        [data-testid="stHeaderActionElements"] {
             display:none !important;
         }
         """
     else:
         header_css = """
         header[data-testid="stHeader"] {display:none !important;}
-        [data-testid="stSidebarCollapsedControl"] {display:none !important;}
         """
 
     st.markdown(
@@ -89,9 +69,8 @@ def hide_streamlit_chrome(keep_sidebar_toggle=False):
         [data-testid="stDecoration"] {{display:none !important;}}
         {header_css}
 
-        /* Remove Streamlit's hover toolbar from images/charts/tables.
-           This removes fullscreen and graph-to-table controls, but not
-           Altair's data-point hover details. */
+        /* Remove Streamlit's image/chart/table toolbar. Altair point hover
+           remains enabled. */
         [data-testid="stElementToolbar"] {{display:none !important;}}
         </style>
         """,
@@ -117,33 +96,48 @@ def inject_login_css():
             display:none !important;
         }}
 
-        /* Lock the Streamlit login content to the right half and centre
-           the complete form block both horizontally and vertically. */
-        main[data-testid="stMain"] .block-container,
-        [data-testid="stMainBlockContainer"] {{
+        /* LOGIN LAYOUT
+           The main Streamlit area itself is now exactly the right half of
+           the viewport. The login content is then centred inside that half,
+           so its position no longer depends on Streamlit wrapper widths. */
+        main[data-testid="stMain"] {{
             position:fixed !important;
             top:0 !important;
             right:0 !important;
             bottom:0 !important;
             left:50vw !important;
-            box-sizing:border-box !important;
             width:50vw !important;
-            max-width:50vw !important;
+            height:100vh !important;
             min-height:100vh !important;
             margin:0 !important;
-            padding:0 clamp(48px,6vw,100px) !important;
-            display:flex !important;
-            flex-direction:column !important;
-            justify-content:center !important;
-            align-items:center !important;
-            overflow-y:auto !important;
+            padding:0 !important;
+            display:grid !important;
+            place-items:center !important;
+            overflow:auto !important;
+            background:#FFFFFF !important;
         }}
 
-        main[data-testid="stMain"] .block-container > div[data-testid="stVerticalBlock"],
-        [data-testid="stMainBlockContainer"] > div[data-testid="stVerticalBlock"] {{
+        main[data-testid="stMain"] .block-container,
+        [data-testid="stMainBlockContainer"] {{
+            position:static !important;
+            inset:auto !important;
+            transform:none !important;
+            box-sizing:border-box !important;
+            width:min(460px, calc(100% - 72px)) !important;
+            max-width:460px !important;
+            min-height:0 !important;
+            margin:0 auto !important;
+            padding:0 !important;
+            display:block !important;
+            overflow:visible !important;
+        }}
+
+        main[data-testid="stMain"] .block-container > div,
+        [data-testid="stMainBlockContainer"] > div {{
             width:100% !important;
             max-width:460px !important;
-            margin:auto !important;
+            margin-left:auto !important;
+            margin-right:auto !important;
         }}
 
         .login-hero {{
@@ -293,14 +287,21 @@ def inject_login_css():
                 font-size:31px;
             }}
 
-            main[data-testid="stMain"] .block-container,
-            [data-testid="stMainBlockContainer"] {{
+            main[data-testid="stMain"] {{
                 position:relative !important;
                 inset:auto !important;
                 width:100vw !important;
-                max-width:100vw !important;
+                height:auto !important;
                 min-height:58vh !important;
-                margin:0 !important;
+                display:block !important;
+            }}
+
+            main[data-testid="stMain"] .block-container,
+            [data-testid="stMainBlockContainer"] {{
+                width:100% !important;
+                max-width:520px !important;
+                min-height:0 !important;
+                margin:0 auto !important;
                 padding:46px 28px !important;
             }}
         }}
@@ -350,6 +351,117 @@ def inject_dashboard_css():
             width:42px !important;
             height:42px !important;
             box-shadow:0 6px 18px rgba(55,15,12,.14);
+        }}
+
+        /* Keep the actual Streamlit toggle visible at all times. */
+        section[data-testid="stSidebar"] [data-testid="stSidebarCollapseButton"] {{
+            visibility:visible !important;
+            opacity:1 !important;
+            display:block !important;
+            pointer-events:auto !important;
+            z-index:1000001 !important;
+        }}
+
+        /* COLLAPSED SIDEBAR
+           Streamlit translates the entire sidebar off-screen when collapsed.
+           Instead, keep only a 58px transparent fixed rail with the original
+           toggle button. Because it is fixed, it takes no width from the main
+           dashboard. Clicking the arrow restores the complete sidebar. */
+        section[data-testid="stSidebar"][aria-expanded="false"] {{
+            position:fixed !important;
+            top:0 !important;
+            left:0 !important;
+            bottom:0 !important;
+            width:58px !important;
+            min-width:58px !important;
+            max-width:58px !important;
+            height:100vh !important;
+            transform:none !important;
+            transition:none !important;
+            background:transparent !important;
+            box-shadow:none !important;
+            border:0 !important;
+            z-index:1000000 !important;
+            pointer-events:none !important;
+        }}
+
+        section[data-testid="stSidebar"][aria-expanded="false"]
+        [data-testid="stSidebarContent"] {{
+            width:58px !important;
+            height:70px !important;
+            overflow:visible !important;
+            padding:0 !important;
+            margin:0 !important;
+            scrollbar-gutter:auto !important;
+            pointer-events:none !important;
+        }}
+
+        section[data-testid="stSidebar"][aria-expanded="false"]
+        [data-testid="stSidebarHeader"] {{
+            width:58px !important;
+            height:66px !important;
+            min-height:66px !important;
+            margin:0 !important;
+            padding:0 !important;
+            display:flex !important;
+            align-items:center !important;
+            justify-content:center !important;
+            overflow:visible !important;
+        }}
+
+        section[data-testid="stSidebar"][aria-expanded="false"]
+        [data-testid="stLogoSpacer"],
+        section[data-testid="stSidebar"][aria-expanded="false"]
+        [data-testid="stSidebarLogo"],
+        section[data-testid="stSidebar"][aria-expanded="false"]
+        [data-testid="stSidebarUserContent"],
+        section[data-testid="stSidebar"][aria-expanded="false"]
+        [data-testid="stSidebarResizeHandle"] {{
+            display:none !important;
+        }}
+
+        section[data-testid="stSidebar"][aria-expanded="false"]
+        [data-testid="stSidebarCollapseButton"] {{
+            display:block !important;
+            visibility:visible !important;
+            opacity:1 !important;
+            position:fixed !important;
+            top:14px !important;
+            left:14px !important;
+            width:44px !important;
+            height:44px !important;
+            margin:0 !important;
+            pointer-events:auto !important;
+            z-index:1000002 !important;
+        }}
+
+        section[data-testid="stSidebar"][aria-expanded="false"]
+        [data-testid="stSidebarCollapseButton"] button {{
+            width:44px !important;
+            height:44px !important;
+            min-width:44px !important;
+            min-height:44px !important;
+            padding:0 !important;
+            border-radius:999px !important;
+            border:1px solid #E4E7EC !important;
+            background:#FFFFFF !important;
+            color:{BRAND_RED} !important;
+            box-shadow:0 6px 18px rgba(32,41,56,.14) !important;
+            pointer-events:auto !important;
+        }}
+
+        /* The native icon points left. Rotate it while collapsed so the
+           remaining button clearly means "open sidebar". */
+        section[data-testid="stSidebar"][aria-expanded="false"]
+        [data-testid="stSidebarCollapseButton"] svg {{
+            transform:rotate(180deg) !important;
+        }}
+
+        /* Give the open-arrow a little breathing room without sacrificing
+           the full-width dashboard layout. */
+        section[data-testid="stSidebar"][aria-expanded="false"] ~
+        main[data-testid="stMain"] .block-container {{
+            padding-left:4.6rem !important;
         }}
 
         .sidebar-logo-wrap {{
@@ -741,7 +853,7 @@ def load_all_data():
     for col in ["Bike Listing", "No. of Sales"]:
         if col not in data:
             data[col] = 0
-        data[col] = pd.to_numeric(data[col], errors="coerce").fillna(0)
+        data[col] = clean_numeric_series(data[col])
 
     data["Date Parsed"] = pd.to_datetime(
         data["Date of Visit"],
@@ -750,6 +862,35 @@ def load_all_data():
     )
 
     return data[columns], staff_members, errors
+
+
+
+def clean_numeric_series(series):
+    """Convert spreadsheet values to numbers and guarantee no NaN values.
+
+    Handles ordinary numbers, blanks, N/A-style text and comma-formatted
+    values. Missing/non-numeric values are treated as 0 for dashboard totals
+    and trend points.
+    """
+    if series is None:
+        return pd.Series(dtype="float64")
+
+    cleaned = (
+        series.astype(str)
+        .str.strip()
+        .str.replace(",", "", regex=False)
+        .replace({
+            "": "0",
+            "nan": "0",
+            "NaN": "0",
+            "None": "0",
+            "N/A": "0",
+            "n/a": "0",
+            "NA": "0",
+            "-": "0",
+        })
+    )
+    return pd.to_numeric(cleaned, errors="coerce").fillna(0.0)
 
 
 def render_kpis(df):
@@ -781,33 +922,34 @@ def render_kpis(df):
 
 
 def dealer_chart(plot_df, metric):
-    """Render either the Sales or Bike Listing trend.
+    """Render either Sales or Bike Listing using safe internal field names.
 
-    Regardless of which trend is visible, hovering a point always shows the
-    complete values for that date: Date, Sales and Bike listings.
+    Hovering either graph always shows the complete values for the date.
     """
     if plot_df.empty:
         return None
 
     plot_df = plot_df.copy()
-    plot_df["No. of Sales"] = pd.to_numeric(
-        plot_df["No. of Sales"], errors="coerce"
-    ).fillna(0.0)
-    plot_df["Bike Listing"] = pd.to_numeric(
-        plot_df["Bike Listing"], errors="coerce"
-    ).fillna(0.0)
+    plot_df["Sales"] = clean_numeric_series(plot_df["Sales"])
+    plot_df["BikeListings"] = clean_numeric_series(plot_df["BikeListings"])
 
-    visible_field = "No. of Sales" if metric == "Sales" else "Bike Listing"
+    visible_field = "Sales" if metric == "Sales" else "BikeListings"
 
     tooltip = [
-        alt.Tooltip("Date Parsed:T", title="Date", format="%d %b %Y"),
-        alt.Tooltip("No. of Sales:Q", title="Sales", format=",.0f"),
-        alt.Tooltip("Bike Listing:Q", title="Bike listings", format=",.0f"),
+        alt.Tooltip(field="Date", type="temporal", title="Date", format="%d %b %Y"),
+        alt.Tooltip(field="Sales", type="quantitative", title="Sales", format=",.0f"),
+        alt.Tooltip(
+            field="BikeListings",
+            type="quantitative",
+            title="Bike listings",
+            format=",.0f",
+        ),
     ]
 
     base = alt.Chart(plot_df).encode(
         x=alt.X(
-            "Date Parsed:T",
+            field="Date",
+            type="temporal",
             title=None,
             axis=alt.Axis(
                 format="%-d %b",
@@ -824,7 +966,8 @@ def dealer_chart(plot_df, metric):
         interpolate="linear",
     ).encode(
         y=alt.Y(
-            f"{visible_field}:Q",
+            field=visible_field,
+            type="quantitative",
             title=None,
             scale=alt.Scale(zero=True),
         )
@@ -842,14 +985,15 @@ def dealer_chart(plot_df, metric):
         ),
     ).encode(
         y=alt.Y(
-            f"{visible_field}:Q",
+            field=visible_field,
+            type="quantitative",
             title=None,
             scale=alt.Scale(zero=True),
         ),
         tooltip=tooltip,
     )
 
-    chart = (
+    return (
         alt.layer(area, line)
         .properties(height=225)
         .configure_view(strokeOpacity=0)
@@ -865,34 +1009,38 @@ def dealer_chart(plot_df, metric):
         )
     )
 
-    return chart
-
 
 def render_dealer_card(dealer, dealer_df):
     dealer_df = dealer_df.copy()
-    dealer_df["No. of Sales"] = pd.to_numeric(
-        dealer_df["No. of Sales"], errors="coerce"
-    ).fillna(0.0)
-    dealer_df["Bike Listing"] = pd.to_numeric(
-        dealer_df["Bike Listing"], errors="coerce"
-    ).fillna(0.0)
+    dealer_df["No. of Sales"] = clean_numeric_series(dealer_df["No. of Sales"])
+    dealer_df["Bike Listing"] = clean_numeric_series(dealer_df["Bike Listing"])
 
     total_sales = dealer_df["No. of Sales"].sum()
     total_listings = dealer_df["Bike Listing"].sum()
 
     dated = dealer_df.dropna(subset=["Date Parsed"]).copy()
     if not dated.empty:
-        plot_df = (
+        grouped = (
             dated.groupby("Date Parsed", as_index=False)[
                 ["No. of Sales", "Bike Listing"]
             ]
             .sum()
             .sort_values("Date Parsed")
         )
-    else:
-        plot_df = pd.DataFrame(
-            columns=["Date Parsed", "No. of Sales", "Bike Listing"]
+
+        # Altair/Vega-Lite uses dots in field names to represent nested paths.
+        # Rename plotting fields so "No. of Sales" cannot be misread.
+        plot_df = grouped.rename(
+            columns={
+                "Date Parsed": "Date",
+                "No. of Sales": "Sales",
+                "Bike Listing": "BikeListings",
+            }
         )
+        plot_df["Sales"] = clean_numeric_series(plot_df["Sales"])
+        plot_df["BikeListings"] = clean_numeric_series(plot_df["BikeListings"])
+    else:
+        plot_df = pd.DataFrame(columns=["Date", "Sales", "BikeListings"])
 
     with st.container(border=True):
         st.markdown(
