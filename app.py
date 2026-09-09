@@ -36,18 +36,63 @@ def logo_data_uri() -> str:
     return f"data:image/png;base64,{encoded}"
 
 
-def hide_streamlit_chrome():
-    st.markdown(
+def hide_streamlit_chrome(keep_sidebar_toggle=False):
+    if keep_sidebar_toggle:
+        header_css = """
+        header[data-testid="stHeader"] {
+            display:block !important;
+            background:transparent !important;
+            height:0 !important;
+            min-height:0 !important;
+            pointer-events:none !important;
+        }
+
+        /* Keep only Streamlit's native sidebar reopen arrow accessible
+           after the sidebar has been collapsed. */
+        [data-testid="stSidebarCollapsedControl"] {
+            display:flex !important;
+            position:fixed !important;
+            top:16px !important;
+            left:16px !important;
+            z-index:1000000 !important;
+            pointer-events:auto !important;
+        }
+
+        [data-testid="stSidebarCollapsedControl"] button {
+            width:42px !important;
+            height:42px !important;
+            min-width:42px !important;
+            border-radius:999px !important;
+            border:1px solid #E4E7EC !important;
+            background:#FFFFFF !important;
+            color:#B52F25 !important;
+            box-shadow:0 6px 18px rgba(32,41,56,.12) !important;
+        }
+
+        [data-testid="stToolbar"],
+        [data-testid="stHeaderActionElements"],
+        [data-testid="stStatusWidget"] {
+            display:none !important;
+        }
         """
-        <style>
-        #MainMenu {display:none !important;}
-        footer {display:none !important;}
+    else:
+        header_css = """
         header[data-testid="stHeader"] {display:none !important;}
-        [data-testid="stDecoration"] {display:none !important;}
+        [data-testid="stSidebarCollapsedControl"] {display:none !important;}
+        """
+
+    st.markdown(
+        f"""
+        <style>
+        #MainMenu {{display:none !important;}}
+        footer {{display:none !important;}}
+        [data-testid="stDecoration"] {{display:none !important;}}
+        {header_css}
 
         /* Remove Streamlit's hover toolbar from images/charts/tables.
-           This removes fullscreen and the chart-to-table control. */
-        [data-testid="stElementToolbar"] {display:none !important;}
+           This removes fullscreen and graph-to-table controls, but not
+           Altair's data-point hover details. */
+        [data-testid="stElementToolbar"] {{display:none !important;}}
         </style>
         """,
         unsafe_allow_html=True,
@@ -72,17 +117,33 @@ def inject_login_css():
             display:none !important;
         }}
 
-        /* Make the Streamlit content itself the right half of the login page. */
-        .block-container {{
+        /* Lock the Streamlit login content to the right half and centre
+           the complete form block both horizontally and vertically. */
+        main[data-testid="stMain"] .block-container,
+        [data-testid="stMainBlockContainer"] {{
+            position:fixed !important;
+            top:0 !important;
+            right:0 !important;
+            bottom:0 !important;
+            left:50vw !important;
             box-sizing:border-box !important;
             width:50vw !important;
             max-width:50vw !important;
             min-height:100vh !important;
-            margin-left:50vw !important;
-            padding:0 clamp(54px,7vw,120px) !important;
+            margin:0 !important;
+            padding:0 clamp(48px,6vw,100px) !important;
             display:flex !important;
             flex-direction:column !important;
             justify-content:center !important;
+            align-items:center !important;
+            overflow-y:auto !important;
+        }}
+
+        main[data-testid="stMain"] .block-container > div[data-testid="stVerticalBlock"],
+        [data-testid="stMainBlockContainer"] > div[data-testid="stVerticalBlock"] {{
+            width:100% !important;
+            max-width:460px !important;
+            margin:auto !important;
         }}
 
         .login-hero {{
@@ -232,11 +293,14 @@ def inject_login_css():
                 font-size:31px;
             }}
 
-            .block-container {{
+            main[data-testid="stMain"] .block-container,
+            [data-testid="stMainBlockContainer"] {{
+                position:relative !important;
+                inset:auto !important;
                 width:100vw !important;
                 max-width:100vw !important;
                 min-height:58vh !important;
-                margin-left:0 !important;
+                margin:0 !important;
                 padding:46px 28px !important;
             }}
         }}
@@ -462,6 +526,40 @@ def inject_dashboard_css():
             line-height:1.2;
         }}
 
+        /* Dealer chart tabs */
+        div[data-testid="stTabs"] [data-baseweb="tab-list"] {{
+            gap:5px !important;
+            background:#F4F5F7 !important;
+            border-radius:10px !important;
+            padding:4px !important;
+            width:max-content !important;
+            margin:.4rem 0 .55rem !important;
+        }}
+
+        div[data-testid="stTabs"] [data-baseweb="tab"] {{
+            min-height:32px !important;
+            height:32px !important;
+            padding:0 14px !important;
+            border-radius:8px !important;
+            color:#707988 !important;
+            font-size:11px !important;
+            font-weight:650 !important;
+        }}
+
+        div[data-testid="stTabs"] [data-baseweb="tab"][aria-selected="true"] {{
+            background:{BRAND_RED} !important;
+            color:#FFFFFF !important;
+        }}
+
+        div[data-testid="stTabs"] [data-baseweb="tab-highlight"],
+        div[data-testid="stTabs"] [data-baseweb="tab-border"] {{
+            display:none !important;
+        }}
+
+        div[data-testid="stTabs"] [role="tabpanel"] {{
+            padding-top:0 !important;
+        }}
+
         div[data-testid="stVerticalBlockBorderWrapper"] {{
             border:1px solid #E8EBF0 !important;
             border-radius:16px !important;
@@ -682,8 +780,12 @@ def render_kpis(df):
             )
 
 
-def dealer_chart(plot_df):
-    """Bike listings are the visible trend; sales remain available on hover."""
+def dealer_chart(plot_df, metric):
+    """Render either the Sales or Bike Listing trend.
+
+    Regardless of which trend is visible, hovering a point always shows the
+    complete values for that date: Date, Sales and Bike listings.
+    """
     if plot_df.empty:
         return None
 
@@ -694,6 +796,8 @@ def dealer_chart(plot_df):
     plot_df["Bike Listing"] = pd.to_numeric(
         plot_df["Bike Listing"], errors="coerce"
     ).fillna(0.0)
+
+    visible_field = "No. of Sales" if metric == "Sales" else "Bike Listing"
 
     tooltip = [
         alt.Tooltip("Date Parsed:T", title="Date", format="%d %b %Y"),
@@ -720,7 +824,7 @@ def dealer_chart(plot_df):
         interpolate="linear",
     ).encode(
         y=alt.Y(
-            "Bike Listing:Q",
+            f"{visible_field}:Q",
             title=None,
             scale=alt.Scale(zero=True),
         )
@@ -737,7 +841,11 @@ def dealer_chart(plot_df):
             strokeWidth=1.4,
         ),
     ).encode(
-        y=alt.Y("Bike Listing:Q", title=None),
+        y=alt.Y(
+            f"{visible_field}:Q",
+            title=None,
+            scale=alt.Scale(zero=True),
+        ),
         tooltip=tooltip,
     )
 
@@ -806,13 +914,21 @@ def render_dealer_card(dealer, dealer_df):
             unsafe_allow_html=True,
         )
 
-        chart = dealer_chart(plot_df)
-        if chart is None:
+        if plot_df.empty:
             st.caption("No valid visit dates are available for this dealer.")
-        else:
-            # Streamlit's element toolbar is hidden with CSS so the graph
-            # cannot accidentally be left in its data-table mode.
-            st.altair_chart(chart, use_container_width=True)
+            return
+
+        sales_tab, listing_tab = st.tabs(["Sales", "Bike Listing"])
+
+        with sales_tab:
+            sales_chart = dealer_chart(plot_df, "Sales")
+            if sales_chart is not None:
+                st.altair_chart(sales_chart, use_container_width=True)
+
+        with listing_tab:
+            listing_chart = dealer_chart(plot_df, "Bike Listing")
+            if listing_chart is not None:
+                st.altair_chart(listing_chart, use_container_width=True)
 
 
 def set_navigation(view_id: str):
@@ -865,7 +981,7 @@ def render_sidebar(staff_members):
 
 
 def dashboard():
-    hide_streamlit_chrome()
+    hide_streamlit_chrome(keep_sidebar_toggle=True)
     inject_dashboard_css()
     st_autorefresh(interval=60_000, key="staff_dashboard_auto_refresh")
 

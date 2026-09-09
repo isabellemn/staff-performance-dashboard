@@ -1,45 +1,37 @@
-# Rider Gate Staff Performance Dashboard V5 - Streamlit + Apps Script
+# Rider Gate Staff Performance Dashboard V6 — Streamlit + Apps Script
 
-V5 addresses the latest interface corrections.
+V6 makes three interface changes requested after V5.
 
-## Changes in V5
+## Changes in V6
 
-- Login screen rebuilt as a true full-height split screen.
-- Dashboard content expands to the full available width when the sidebar is collapsed.
-- Rider Gate logo is rendered as normal HTML, so it no longer has a fullscreen/expand control.
-- Sidebar navigation uses real buttons instead of radio buttons.
-- Overview uses a home icon and staff use account/user icons.
-- Streamlit element toolbars are hidden, removing the graph-to-table/fullscreen controls.
-- Dealer graph now displays Bike Listings only as the visible red shaded trend.
-- Hover still shows Date, Sales and Bike Listings.
-- Removed the Sales/Bike Listings colour legend because two visible trend lines are no longer used.
-- Removed helper fields such as "Sales Tooltip" and "Listings Tooltip".
-- Dealer Performance Summary has a visible row number starting at 1.
-- Malaysia timezone remains Asia/Kuala_Lumpur.
-- Apps Script API setup is unchanged.
+1. Login form
+   - The full login block is now centred horizontally and vertically within the right half of the screen.
+   - The Rider Gate panel remains on the left.
 
-## Update GitHub from CMD
+2. Collapsible sidebar
+   - Dashboard content still expands to full width when the sidebar is closed.
+   - Streamlit's native sidebar reopen arrow is deliberately retained and styled as a white circular button.
+   - The rest of Streamlit's toolbar/chrome remains hidden.
 
-Replace the old project files with the V5 files, keeping your existing `.git` folder.
-
-Then run:
-
-```cmd
-git add .
-git commit -m "Update staff dashboard interface V5"
-git push
-```
-
-Streamlit should redeploy automatically.
+3. Dealer trend tabs
+   - Every dealer card now contains two tabs:
+     - Sales
+     - Bike Listing
+   - Selecting Sales shows that dealer's sales trend.
+   - Selecting Bike Listing shows that dealer's bike-listing trend.
+   - The total sales and total bike listings remain in the top-right corner of the dealer card.
+   - Hovering any graph point always shows the full details for that date:
+     - Date
+     - Sales
+     - Bike listings
 
 ## Apps Script
 
-No Apps Script redeployment is required for these interface changes.
-The included `apps-script/Code.gs` is the same API approach as before.
+No Apps Script change or redeployment is required for V6.
 
 ## Streamlit Secrets
 
-Your existing secrets remain:
+Keep your existing secrets unchanged:
 
 ```toml
 [app]
@@ -50,4 +42,16 @@ url = "YOUR_APPS_SCRIPT_EXEC_URL"
 token = "YOUR_API_TOKEN"
 ```
 
-Do not commit real secrets to GitHub.
+## Update GitHub with CMD
+
+Replace your old project files with the V6 files, while keeping the existing `.git` folder.
+
+Then run:
+
+```cmd
+git add .
+git commit -m "Update dashboard login sidebar and dealer trend tabs"
+git push
+```
+
+Streamlit should redeploy automatically.
