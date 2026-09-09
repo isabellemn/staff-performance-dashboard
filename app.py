@@ -1,19 +1,18 @@
 import base64
 import hmac
-import re
 from datetime import datetime
-from zoneinfo import ZoneInfo
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import altair as alt
-import requests
 import pandas as pd
+import requests
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 
 st.set_page_config(
-    page_title="Rider Gate DM Performance Dashboard",
-    page_icon="👤",
+    page_title="Rider Gate Staff Performance Dashboard",
+    page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -28,14 +27,6 @@ INK = "#202938"
 MUTED = "#7B8494"
 LIGHT_BG = "#F6F8FB"
 GRID = "#E8EBF0"
-LISTING_COLOUR = "#6B7280"
-
-HEADER_VARIANTS = {
-    "Date of Visit": {"date of visit", "date visit", "visit date", "date"},
-    "Dealer Name": {"dealer name", "dealer"},
-    "Bike Listing": {"bike listing", "bike listings", "listing", "listings"},
-    "No. of Sales": {"no. of sales", "no of sales", "number of sales", "sales"},
-}
 
 
 def logo_data_uri() -> str:
@@ -49,9 +40,14 @@ def hide_streamlit_chrome():
     st.markdown(
         """
         <style>
-        #MainMenu {visibility:hidden;}
-        footer {visibility:hidden;}
-        header[data-testid="stHeader"] {background:transparent;}
+        #MainMenu {display:none !important;}
+        footer {display:none !important;}
+        header[data-testid="stHeader"] {display:none !important;}
+        [data-testid="stDecoration"] {display:none !important;}
+
+        /* Remove Streamlit's hover toolbar from images/charts/tables.
+           This removes fullscreen and the chart-to-table control. */
+        [data-testid="stElementToolbar"] {display:none !important;}
         </style>
         """,
         unsafe_allow_html=True,
@@ -62,79 +58,187 @@ def inject_login_css():
     st.markdown(
         f"""
         <style>
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400,0,0&display=swap');
-        html, body, [class*="css"] {{font-family:'Poppins', sans-serif;}}
-        .stApp {{background:#FFFFFF;}}
-        section[data-testid="stSidebar"] {{display:none !important;}}
-        .block-container {{max-width:none !important; padding:0 !important;}}
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
 
-        /* Full-screen split login, matching the Rider Gate dashboard reference. */
-        div[data-testid="stHorizontalBlock"]:has(.login-panel) {{
-            gap:0 !important;
-            min-height:100vh;
-            align-items:stretch !important;
+        html, body, [class*="css"] {{
+            font-family:'Poppins',sans-serif;
         }}
-        div[data-testid="stHorizontalBlock"]:has(.login-panel) > div[data-testid="stColumn"] {{
-            min-height:100vh;
+
+        .stApp {{
+            background:#FFFFFF;
         }}
-        div[data-testid="stHorizontalBlock"]:has(.login-panel) > div[data-testid="stColumn"]:first-child {{
-            background:linear-gradient(145deg, {BRAND_RED} 0%, {BRAND_RED_DARK} 100%);
+
+        section[data-testid="stSidebar"] {{
+            display:none !important;
         }}
-        div[data-testid="stHorizontalBlock"]:has(.login-panel) > div[data-testid="stColumn"]:nth-child(2) {{
-            display:flex;
-            align-items:center;
-            justify-content:center;
-            background:#fff;
+
+        /* Make the Streamlit content itself the right half of the login page. */
+        .block-container {{
+            box-sizing:border-box !important;
+            width:50vw !important;
+            max-width:50vw !important;
+            min-height:100vh !important;
+            margin-left:50vw !important;
+            padding:0 clamp(54px,7vw,120px) !important;
+            display:flex !important;
+            flex-direction:column !important;
+            justify-content:center !important;
         }}
-        div[data-testid="stHorizontalBlock"]:has(.login-panel) > div[data-testid="stColumn"]:nth-child(2) > div {{
-            width:min(520px, 76%);
-        }}
-        .login-panel {{
-            min-height:100vh;
-            padding:clamp(48px,7vw,100px);
-            color:white;
+
+        .login-hero {{
+            position:fixed;
+            inset:0 auto 0 0;
+            width:50vw;
+            height:100vh;
+            overflow:hidden;
+            background:
+                radial-gradient(circle at 12% 16%, rgba(255,255,255,.12) 0 90px, transparent 91px),
+                radial-gradient(circle at 82% 84%, rgba(255,255,255,.07) 0 180px, transparent 181px),
+                linear-gradient(145deg,{BRAND_RED} 0%, {BRAND_RED_DARK} 100%);
+            color:#FFFFFF;
+            padding:clamp(54px,7vw,110px);
             display:flex;
             flex-direction:column;
             justify-content:center;
+            z-index:2;
         }}
-        .login-panel img {{
-            width:142px;
-            border-radius:15px;
-            margin-bottom:46px;
-            box-shadow:0 9px 22px rgba(94,15,11,.18);
+
+        .login-hero-inner {{
+            max-width:580px;
+            position:relative;
+            z-index:3;
         }}
-        .login-panel h1 {{
-            font-size:clamp(30px,3vw,46px);
-            line-height:1.12;
+
+        .login-logo {{
+            display:block;
+            width:128px;
+            height:auto;
+            border-radius:16px;
+            margin:0 0 42px 0;
+            box-shadow:0 12px 32px rgba(65,10,8,.20);
+        }}
+
+        .login-eyebrow {{
+            font-size:11px;
+            font-weight:700;
+            text-transform:uppercase;
+            letter-spacing:.18em;
+            opacity:.72;
+            margin-bottom:14px;
+        }}
+
+        .login-hero h1 {{
             margin:0 0 20px;
+            font-size:clamp(34px,3.2vw,54px);
+            line-height:1.08;
+            letter-spacing:-1.8px;
             font-weight:800;
-            letter-spacing:-1.4px;
-            max-width:560px;
         }}
-        .login-panel p {{
+
+        .login-hero p {{
+            margin:0;
+            max-width:520px;
             font-size:13px;
             line-height:1.85;
-            opacity:.88;
-            max-width:520px;
-            margin:0;
+            color:rgba(255,255,255,.82);
         }}
-        .login-form-title {{font-size:24px;font-weight:750;color:{INK};margin:0 0 24px;}}
-        div[data-testid="stTextInput"] label p {{font-size:12px;font-weight:600;color:{MUTED};}}
+
+        .login-form-title {{
+            width:100%;
+            max-width:460px;
+            margin:0 auto 5px;
+            font-size:28px;
+            font-weight:800;
+            letter-spacing:-.6px;
+            color:{INK};
+        }}
+
+        .login-form-subtitle {{
+            width:100%;
+            max-width:460px;
+            margin:0 auto 28px;
+            color:{MUTED};
+            font-size:12px;
+            line-height:1.6;
+        }}
+
+        div[data-testid="stForm"] {{
+            width:100% !important;
+            max-width:460px !important;
+            margin:0 auto !important;
+            padding:0 !important;
+            border:0 !important;
+        }}
+
+        div[data-testid="stForm"] label p {{
+            font-size:11px !important;
+            font-weight:650 !important;
+            color:{MUTED} !important;
+        }}
+
         div[data-testid="stTextInput"] input {{
-            border-radius:8px;border:1px solid #C9CED7;min-height:46px;background:#fff;
+            min-height:48px;
+            border:1px solid #D7DCE4;
+            border-radius:10px;
+            background:#FFFFFF;
+            color:{INK};
+            box-shadow:none;
         }}
+
+        div[data-testid="stTextInput"] input:focus {{
+            border-color:{BRAND_RED};
+            box-shadow:0 0 0 2px rgba(181,47,37,.08);
+        }}
+
         div[data-testid="stFormSubmitButton"] button {{
-            width:100%;background:{BRAND_RED};color:#fff;border:0;border-radius:8px;min-height:46px;font-weight:700;
+            min-height:48px;
+            width:100%;
+            border:0 !important;
+            border-radius:10px;
+            background:{BRAND_RED} !important;
+            color:#FFFFFF !important;
+            font-weight:700;
+            box-shadow:0 8px 18px rgba(181,47,37,.16);
         }}
-        div[data-testid="stFormSubmitButton"] button:hover {{background:{BRAND_RED_DARK};color:#fff;border:0;}}
-        .login-hint {{color:{MUTED};font-size:11px;margin-top:15px;}}
-        @media(max-width:800px) {{
-            div[data-testid="stHorizontalBlock"]:has(.login-panel) {{display:block !important;}}
-            div[data-testid="stHorizontalBlock"]:has(.login-panel) > div[data-testid="stColumn"] {{min-height:auto; width:100% !important;}}
-            .login-panel {{min-height:42vh;padding:36px 28px;}}
-            .login-panel img {{width:105px;margin-bottom:25px;}}
-            div[data-testid="stHorizontalBlock"]:has(.login-panel) > div[data-testid="stColumn"]:nth-child(2) {{min-height:58vh;padding:34px 0;}}
-            div[data-testid="stHorizontalBlock"]:has(.login-panel) > div[data-testid="stColumn"]:nth-child(2) > div {{width:84%;}}
+
+        div[data-testid="stFormSubmitButton"] button:hover {{
+            background:{BRAND_RED_DARK} !important;
+            color:#FFFFFF !important;
+        }}
+
+        .login-hint {{
+            width:100%;
+            max-width:460px;
+            margin:16px auto 0;
+            font-size:10px;
+            color:#9AA1AD;
+        }}
+
+        @media (max-width:800px) {{
+            .login-hero {{
+                position:relative;
+                width:100vw;
+                height:auto;
+                min-height:42vh;
+                padding:38px 28px;
+            }}
+
+            .login-logo {{
+                width:92px;
+                margin-bottom:24px;
+            }}
+
+            .login-hero h1 {{
+                font-size:31px;
+            }}
+
+            .block-container {{
+                width:100vw !important;
+                max-width:100vw !important;
+                min-height:58vh !important;
+                margin-left:0 !important;
+                padding:46px 28px !important;
+            }}
         }}
         </style>
         """,
@@ -146,98 +250,246 @@ def inject_dashboard_css():
     st.markdown(
         f"""
         <style>
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400,0,0&display=swap');
-        html, body, [class*="css"] {{font-family:'Poppins', sans-serif;}}
-        .stApp {{background:{LIGHT_BG};}}
-        .block-container {{padding-top:1.45rem;padding-bottom:3rem;max-width:1550px;}}
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
 
-        /* Rider Gate sidebar - no Streamlit radio circles. */
+        html, body, [class*="css"] {{
+            font-family:'Poppins',sans-serif;
+        }}
+
+        .stApp {{
+            background:{LIGHT_BG};
+        }}
+
+        /* Critical: the dashboard now uses the entire available width.
+           When the sidebar is collapsed, the content expands with it. */
+        .block-container {{
+            width:100% !important;
+            max-width:none !important;
+            padding:1.45rem clamp(1rem,2.2vw,2.4rem) 3rem !important;
+        }}
+
+        /* Sidebar */
         section[data-testid="stSidebar"] {{
             background:linear-gradient(180deg,{BRAND_RED} 0%, {BRAND_RED_DARK} 100%);
-            border-right:0;
-            min-width:270px !important;
-            max-width:270px !important;
+            border-right:0 !important;
         }}
-        section[data-testid="stSidebar"] > div {{padding-top:1.3rem;}}
-        section[data-testid="stSidebar"] img {{
-            display:block;margin:1.25rem auto 2.2rem auto;max-width:205px;border-radius:22px;
-            box-shadow:0 8px 24px rgba(84,17,13,.14);
+
+        section[data-testid="stSidebar"] > div:first-child {{
+            padding-top:1rem;
         }}
+
         section[data-testid="stSidebar"] [data-testid="stSidebarCollapseButton"] button {{
-            background:#fff !important;color:{BRAND_RED} !important;border-radius:999px !important;
-            width:42px;height:42px;border:0 !important;box-shadow:0 5px 15px rgba(55,15,12,.12);
+            background:#FFFFFF !important;
+            color:{BRAND_RED} !important;
+            border:0 !important;
+            border-radius:999px !important;
+            width:42px !important;
+            height:42px !important;
+            box-shadow:0 6px 18px rgba(55,15,12,.14);
         }}
+
+        .sidebar-logo-wrap {{
+            padding:1rem .8rem 1.9rem;
+            text-align:center;
+        }}
+
+        .sidebar-logo-wrap img {{
+            width:min(205px,88%);
+            max-width:205px;
+            height:auto;
+            border-radius:22px;
+            box-shadow:0 10px 25px rgba(67,13,10,.16);
+        }}
+
         .sidebar-label {{
-            font-size:10px;letter-spacing:.15em;color:rgba(255,255,255,.70);font-weight:700;
-            margin:0 .8rem .55rem;text-transform:uppercase;
+            margin:0 .85rem .65rem;
+            color:rgba(255,255,255,.66);
+            font-size:10px;
+            font-weight:700;
+            letter-spacing:.15em;
+            text-transform:uppercase;
         }}
-        section[data-testid="stSidebar"] div[role="radiogroup"] {{gap:.44rem;padding:0 .62rem;}}
-        section[data-testid="stSidebar"] div[role="radiogroup"] label {{
-            padding:.78rem .85rem !important;
+
+        /* Real buttons instead of radio buttons. */
+        section[data-testid="stSidebar"] div[data-testid="stButton"] {{
+            margin:.18rem .62rem !important;
+        }}
+
+        section[data-testid="stSidebar"] div[data-testid="stButton"] button {{
+            width:100% !important;
+            min-height:50px !important;
+            justify-content:flex-start !important;
             border-radius:12px !important;
-            transition:.15s ease;
-            font-weight:650 !important;
-            background:transparent;
-            min-height:48px;
-        }}
-        section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {{background:rgba(255,255,255,.09);}}
-        section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {{background:rgba(255,255,255,.20);}}
-        section[data-testid="stSidebar"] div[role="radiogroup"] label > div:first-child {{display:none !important;}}
-        section[data-testid="stSidebar"] div[role="radiogroup"] label p,
-        section[data-testid="stSidebar"] div[role="radiogroup"] label span,
-        section[data-testid="stSidebar"] div[role="radiogroup"] label * {{
-            color:#fff !important;
-            font-family:'Poppins',sans-serif !important;
+            padding:.68rem .85rem !important;
+            border:0 !important;
+            box-shadow:none !important;
             font-size:14px !important;
+            font-weight:650 !important;
+            transition:.15s ease;
         }}
-        section[data-testid="stSidebar"] div[role="radiogroup"] label p::before {{
-            font-family:'Material Symbols Rounded' !important;
-            font-size:20px !important;
-            font-weight:400 !important;
-            vertical-align:-4px;
-            margin-right:11px;
-            content:'account_box';
-        }}
-        section[data-testid="stSidebar"] div[role="radiogroup"] label:first-child p::before {{content:'home';}}
 
-        h1,h2,h3,p,span,label,button,input {{font-family:'Poppins', sans-serif;}}
-        h1 {{color:{INK};letter-spacing:-.8px;}}
-        h2,h3 {{color:{INK};}}
-        .top-subtitle {{color:{MUTED};font-size:12px;margin-top:-5px;}}
-        .sync-text {{color:#8991A0;font-size:11px;text-align:right;padding-top:10px;white-space:nowrap;}}
-
-        div[data-testid="stButton"] button {{
-            background:#fff;color:{INK};border:1px solid #E1E5EB;border-radius:12px;min-height:42px;
-            font-weight:650;box-shadow:0 2px 8px rgba(32,41,56,.03);white-space:nowrap;font-size:12px;
+        section[data-testid="stSidebar"] div[data-testid="stButton"] button[kind="secondary"] {{
+            background:transparent !important;
+            color:#FFFFFF !important;
         }}
-        div[data-testid="stButton"] button:hover {{border-color:#CDD2DA;color:{BRAND_RED};background:#fff;}}
+
+        section[data-testid="stSidebar"] div[data-testid="stButton"] button[kind="secondary"]:hover {{
+            background:rgba(255,255,255,.09) !important;
+            color:#FFFFFF !important;
+        }}
+
+        section[data-testid="stSidebar"] div[data-testid="stButton"] button[kind="primary"] {{
+            background:rgba(255,255,255,.21) !important;
+            color:#FFFFFF !important;
+        }}
+
+        section[data-testid="stSidebar"] div[data-testid="stButton"] button svg {{
+            color:#FFFFFF !important;
+            fill:#FFFFFF !important;
+        }}
+
+        h1,h2,h3,p,span,label,button,input {{
+            font-family:'Poppins',sans-serif;
+        }}
+
+        h1,h2,h3 {{
+            color:{INK};
+        }}
+
+        .top-subtitle {{
+            color:{MUTED};
+            font-size:12px;
+            margin-top:-4px;
+        }}
+
+        .sync-text {{
+            color:#8991A0;
+            font-size:11px;
+            text-align:right;
+            padding-top:10px;
+            white-space:nowrap;
+        }}
+
+        /* Normal dashboard action buttons */
+        main div[data-testid="stButton"] button {{
+            background:#FFFFFF;
+            color:{INK};
+            border:1px solid #E1E5EB;
+            border-radius:12px;
+            min-height:42px;
+            font-weight:650;
+            box-shadow:0 2px 8px rgba(32,41,56,.03);
+            white-space:nowrap;
+            font-size:12px;
+        }}
+
+        main div[data-testid="stButton"] button:hover {{
+            border-color:#CDD2DA;
+            color:{BRAND_RED};
+            background:#FFFFFF;
+        }}
 
         .kpi-card {{
-            background:#fff;border:1px solid #E7EAF0;border-radius:16px;padding:18px 20px;
-            box-shadow:0 8px 24px rgba(32,41,56,.04);min-height:112px;
+            background:#FFFFFF;
+            border:1px solid #E7EAF0;
+            border-radius:16px;
+            padding:18px 20px;
+            box-shadow:0 8px 24px rgba(32,41,56,.04);
+            min-height:112px;
         }}
-        .kpi-label {{font-size:11px;font-weight:650;color:{MUTED};text-transform:uppercase;letter-spacing:.05em;}}
-        .kpi-value {{font-size:28px;font-weight:800;color:{INK};margin-top:8px;letter-spacing:-.8px;}}
-        .kpi-note {{font-size:10px;color:#9AA1AD;margin-top:3px;}}
 
-        .section-title {{font-size:17px;font-weight:750;color:{INK};margin:1.2rem 0 .65rem;}}
-        .dealer-header {{display:flex;justify-content:space-between;align-items:flex-start;gap:15px;margin-bottom:0;}}
-        .dealer-name {{font-size:13px;font-weight:700;color:#5F6878;}}
-        .dealer-totals {{display:flex;gap:14px;text-align:right;}}
-        .dealer-total-label {{font-size:8px;text-transform:uppercase;letter-spacing:.05em;color:#A0A7B2;}}
-        .dealer-total-value {{font-size:16px;font-weight:800;color:{ACCENT_RED};line-height:1.2;}}
+        .kpi-label {{
+            font-size:11px;
+            font-weight:650;
+            color:{MUTED};
+            text-transform:uppercase;
+            letter-spacing:.05em;
+        }}
+
+        .kpi-value {{
+            font-size:28px;
+            font-weight:800;
+            color:{INK};
+            margin-top:8px;
+            letter-spacing:-.8px;
+        }}
+
+        .kpi-note {{
+            font-size:10px;
+            color:#9AA1AD;
+            margin-top:3px;
+        }}
+
+        .section-title {{
+            font-size:17px;
+            font-weight:750;
+            color:{INK};
+            margin:1.2rem 0 .65rem;
+        }}
+
+        .dealer-header {{
+            display:flex;
+            justify-content:space-between;
+            align-items:flex-start;
+            gap:15px;
+            margin-bottom:2px;
+        }}
+
+        .dealer-name {{
+            font-size:14px;
+            font-weight:700;
+            color:#5F6878;
+            padding-top:3px;
+        }}
+
+        .dealer-totals {{
+            display:flex;
+            gap:16px;
+            text-align:right;
+        }}
+
+        .dealer-total-label {{
+            font-size:8px;
+            text-transform:uppercase;
+            letter-spacing:.05em;
+            color:#A0A7B2;
+        }}
+
+        .dealer-total-value {{
+            font-size:17px;
+            font-weight:800;
+            color:{ACCENT_RED};
+            line-height:1.2;
+        }}
+
         div[data-testid="stVerticalBlockBorderWrapper"] {{
-            border:1px solid #E8EBF0 !important;border-radius:16px !important;
+            border:1px solid #E8EBF0 !important;
+            border-radius:16px !important;
             background:
-                linear-gradient(rgba(255,255,255,.96),rgba(255,255,255,.96)),
+                linear-gradient(rgba(255,255,255,.97),rgba(255,255,255,.97)),
                 repeating-linear-gradient(135deg,#F1F3F6 0,#F1F3F6 1px,transparent 1px,transparent 13px) !important;
             box-shadow:0 8px 25px rgba(32,41,56,.04);
         }}
-        div[data-testid="stDataFrame"] {{border-radius:14px;overflow:hidden;border:1px solid #E7EAF0;}}
-        div[data-testid="stDateInput"] input, div[data-testid="stTextInput"] input {{
-            background:#fff;border-radius:10px;border:1px solid #DDE1E7;min-height:40px;
+
+        div[data-testid="stDataFrame"] {{
+            border-radius:14px;
+            overflow:hidden;
+            border:1px solid #E7EAF0;
         }}
-        .data-note {{font-size:10px;color:{MUTED};margin-top:2px;}}
+
+        div[data-testid="stDateInput"] input,
+        div[data-testid="stTextInput"] input {{
+            background:#FFFFFF;
+            border-radius:10px;
+            border:1px solid #DDE1E7;
+            min-height:40px;
+        }}
+
+        @media(max-width:900px) {{
+            .dealer-totals {{
+                gap:8px;
+            }}
+        }}
         </style>
         """,
         unsafe_allow_html=True,
@@ -258,65 +510,59 @@ def is_authenticated() -> bool:
 def login_screen():
     hide_streamlit_chrome()
     inject_login_css()
+
     logo = logo_data_uri()
+    logo_html = f'<img class="login-logo" src="{logo}" alt="Rider Gate logo">' if logo else ""
 
-    left, right = st.columns([1, 1], gap="large")
-    with left:
-        img_html = f'<img src="{logo}" alt="Rider Gate logo">' if logo else ""
-        st.markdown(
-            f"""
-            <div class="login-panel">
-                {img_html}
-                <h1>Rider Gate Staff<br>Performance Dashboard</h1>
-                <p>Access dealer visits, bike listings and sales performance across Rider Gate staff and dealers in one secure dashboard.</p>
+    st.markdown(
+        f"""
+        <div class="login-hero">
+            <div class="login-hero-inner">
+                {logo_html}
+                <div class="login-eyebrow">Rider Gate</div>
+                <h1>Staff Performance<br>Dashboard</h1>
+                <p>
+                    Access dealer visits, bike listings and staff sales performance
+                    in one secure dashboard.
+                </p>
             </div>
-            """,
-            unsafe_allow_html=True,
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown('<div class="login-form-title">Dashboard Login</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="login-form-subtitle">Enter your password to access the staff performance dashboard.</div>',
+        unsafe_allow_html=True,
+    )
+
+    with st.form("login_form", clear_on_submit=False):
+        password = st.text_input(
+            "Password",
+            type="password",
+            placeholder="Enter password",
         )
+        submitted = st.form_submit_button("Login", use_container_width=True)
 
-    with right:
-        st.markdown('<div class="login-form-title">Dashboard Login</div>', unsafe_allow_html=True)
-        with st.form("login_form", clear_on_submit=False):
-            password = st.text_input("Password", type="password", placeholder="Enter password")
-            submitted = st.form_submit_button("Login", use_container_width=True)
+    if submitted:
+        expected = get_app_password()
+        if not expected:
+            st.error("The dashboard password has not been configured in Streamlit Secrets.")
+        elif hmac.compare_digest(password, expected):
+            st.session_state["authenticated"] = True
+            st.session_state["login_error"] = False
+            st.rerun()
+        else:
+            st.session_state["login_error"] = True
 
-        if submitted:
-            expected = get_app_password()
-            if not expected:
-                st.error("The dashboard password has not been configured in Streamlit Secrets.")
-            elif hmac.compare_digest(password, expected):
-                st.session_state["authenticated"] = True
-                st.session_state["login_error"] = False
-                st.rerun()
-            else:
-                st.session_state["login_error"] = True
+    if st.session_state.get("login_error"):
+        st.error("Incorrect password.")
 
-        if st.session_state.get("login_error"):
-            st.error("Incorrect password.")
-        st.markdown(
-            '<div class="login-hint">Authorised Rider Gate users only.</div>',
-            unsafe_allow_html=True,
-        )
-
-
-def normalise_header(value):
-    s = str(value or "").strip().lower()
-    s = re.sub(r"[._-]+", " ", s)
-    return re.sub(r"\s+", " ", s).strip()
-
-
-def detect_header_row(matrix):
-    for i, row in enumerate(matrix[:20]):
-        values = [normalise_header(v) for v in row]
-        mapping = {}
-        for canonical, variants in HEADER_VARIANTS.items():
-            idx = next((j for j, cell in enumerate(values) if cell in variants), None)
-            if idx is None:
-                break
-            mapping[canonical] = idx
-        if len(mapping) == len(HEADER_VARIANTS):
-            return i, mapping
-    return None, None
+    st.markdown(
+        '<div class="login-hint">Authorised Rider Gate users only.</div>',
+        unsafe_allow_html=True,
+    )
 
 
 def data_api_configuration():
@@ -378,15 +624,16 @@ def load_all_data():
         return pd.DataFrame(columns=columns), staff_members, errors
 
     data = pd.DataFrame(rows)
-    rename = {
-        "date": "Date of Visit",
-        "dealer": "Dealer Name",
-        "bikeListing": "Bike Listing",
-        "sales": "No. of Sales",
-        "staffId": "Staff ID",
-        "staffName": "Staff Name",
-    }
-    data = data.rename(columns=rename)
+    data = data.rename(
+        columns={
+            "date": "Date of Visit",
+            "dealer": "Dealer Name",
+            "bikeListing": "Bike Listing",
+            "sales": "No. of Sales",
+            "staffId": "Staff ID",
+            "staffName": "Staff Name",
+        }
+    )
 
     for col in ["Date of Visit", "Dealer Name", "Staff ID", "Staff Name"]:
         if col not in data:
@@ -398,20 +645,28 @@ def load_all_data():
             data[col] = 0
         data[col] = pd.to_numeric(data[col], errors="coerce").fillna(0)
 
-    data["Date Parsed"] = pd.to_datetime(data["Date of Visit"], errors="coerce", dayfirst=True)
+    data["Date Parsed"] = pd.to_datetime(
+        data["Date of Visit"],
+        errors="coerce",
+        dayfirst=True,
+    )
+
     return data[columns], staff_members, errors
+
 
 def render_kpis(df):
     visits = len(df)
     sales = df["No. of Sales"].sum() if not df.empty else 0
     listings = df["Bike Listing"].sum() if not df.empty else 0
     dealers = df["Dealer Name"].str.lower().nunique() if not df.empty else 0
+
     values = [
         ("Total Visits", visits, "Recorded dealer visits"),
         ("Total Sales", sales, "Sales recorded"),
         ("Bike Listings", listings, "Listings recorded"),
         ("Active Dealers", dealers, "Unique dealers"),
     ]
+
     cols = st.columns(4)
     for col, (label, value, note) in zip(cols, values):
         with col:
@@ -428,62 +683,67 @@ def render_kpis(df):
 
 
 def dealer_chart(plot_df):
+    """Bike listings are the visible trend; sales remain available on hover."""
     if plot_df.empty:
         return None
 
     plot_df = plot_df.copy()
-    plot_df["No. of Sales"] = pd.to_numeric(plot_df["No. of Sales"], errors="coerce").fillna(0.0)
-    plot_df["Bike Listing"] = pd.to_numeric(plot_df["Bike Listing"], errors="coerce").fillna(0.0)
-    plot_df["Sales Tooltip"] = plot_df["No. of Sales"].map(lambda v: f"{v:,.0f}")
-    plot_df["Listings Tooltip"] = plot_df["Bike Listing"].map(lambda v: f"{v:,.0f}")
+    plot_df["No. of Sales"] = pd.to_numeric(
+        plot_df["No. of Sales"], errors="coerce"
+    ).fillna(0.0)
+    plot_df["Bike Listing"] = pd.to_numeric(
+        plot_df["Bike Listing"], errors="coerce"
+    ).fillna(0.0)
+
+    tooltip = [
+        alt.Tooltip("Date Parsed:T", title="Date", format="%d %b %Y"),
+        alt.Tooltip("No. of Sales:Q", title="Sales", format=",.0f"),
+        alt.Tooltip("Bike Listing:Q", title="Bike listings", format=",.0f"),
+    ]
 
     base = alt.Chart(plot_df).encode(
         x=alt.X(
             "Date Parsed:T",
             title=None,
-            axis=alt.Axis(format="%-d %b", labelAngle=0, labelOverlap=True, tickCount=6),
+            axis=alt.Axis(
+                format="%-d %b",
+                labelAngle=0,
+                labelOverlap=True,
+                tickCount=6,
+            ),
         )
     )
 
-    tooltip = [
-        alt.Tooltip("Date Parsed:T", title="Date", format="%d %b %Y"),
-        alt.Tooltip("Sales Tooltip:N", title="Sales"),
-        alt.Tooltip("Listings Tooltip:N", title="Bike listings"),
-    ]
-
-    # Bike listings form the main shaded trend so the card keeps the strong red visual
-    # shown in the Rider Gate reference even when sales numbers are much smaller.
-    listing_area = base.mark_area(
+    area = base.mark_area(
         color=ACCENT_RED,
-        opacity=0.13,
+        opacity=0.14,
         interpolate="linear",
     ).encode(
-        y=alt.Y("Bike Listing:Q", title=None),
-        tooltip=tooltip,
+        y=alt.Y(
+            "Bike Listing:Q",
+            title=None,
+            scale=alt.Scale(zero=True),
+        )
     )
 
-    listing_line = base.mark_line(
+    line = base.mark_line(
         color=ACCENT_RED,
-        strokeWidth=2.6,
-        point=alt.OverlayMarkDef(filled=True, color=ACCENT_RED, size=46),
+        strokeWidth=2.8,
+        point=alt.OverlayMarkDef(
+            filled=True,
+            color=ACCENT_RED,
+            size=52,
+            stroke="white",
+            strokeWidth=1.4,
+        ),
     ).encode(
         y=alt.Y("Bike Listing:Q", title=None),
-        tooltip=tooltip,
-    )
-
-    sales_line = base.mark_line(
-        color=BRAND_RED_DARK,
-        strokeWidth=2.4,
-        point=alt.OverlayMarkDef(filled=True, color=BRAND_RED_DARK, size=44),
-    ).encode(
-        y=alt.Y("No. of Sales:Q", title=None),
         tooltip=tooltip,
     )
 
     chart = (
-        alt.layer(listing_area, listing_line, sales_line)
-        .resolve_scale(y="shared")
-        .properties(height=220)
+        alt.layer(area, line)
+        .properties(height=225)
         .configure_view(strokeOpacity=0)
         .configure_axis(
             labelFont="Poppins",
@@ -496,13 +756,18 @@ def dealer_chart(plot_df):
             ticks=False,
         )
     )
+
     return chart
 
 
 def render_dealer_card(dealer, dealer_df):
     dealer_df = dealer_df.copy()
-    dealer_df["No. of Sales"] = pd.to_numeric(dealer_df["No. of Sales"], errors="coerce").fillna(0.0)
-    dealer_df["Bike Listing"] = pd.to_numeric(dealer_df["Bike Listing"], errors="coerce").fillna(0.0)
+    dealer_df["No. of Sales"] = pd.to_numeric(
+        dealer_df["No. of Sales"], errors="coerce"
+    ).fillna(0.0)
+    dealer_df["Bike Listing"] = pd.to_numeric(
+        dealer_df["Bike Listing"], errors="coerce"
+    ).fillna(0.0)
 
     total_sales = dealer_df["No. of Sales"].sum()
     total_listings = dealer_df["Bike Listing"].sum()
@@ -510,39 +775,93 @@ def render_dealer_card(dealer, dealer_df):
     dated = dealer_df.dropna(subset=["Date Parsed"]).copy()
     if not dated.empty:
         plot_df = (
-            dated.groupby("Date Parsed", as_index=False)[["No. of Sales", "Bike Listing"]]
+            dated.groupby("Date Parsed", as_index=False)[
+                ["No. of Sales", "Bike Listing"]
+            ]
             .sum()
             .sort_values("Date Parsed")
         )
-        plot_df["No. of Sales"] = pd.to_numeric(plot_df["No. of Sales"], errors="coerce").fillna(0.0)
-        plot_df["Bike Listing"] = pd.to_numeric(plot_df["Bike Listing"], errors="coerce").fillna(0.0)
     else:
-        plot_df = pd.DataFrame(columns=["Date Parsed", "No. of Sales", "Bike Listing"])
+        plot_df = pd.DataFrame(
+            columns=["Date Parsed", "No. of Sales", "Bike Listing"]
+        )
 
     with st.container(border=True):
         st.markdown(
             f"""
             <div class="dealer-header">
-                <div>
-                    <div class="dealer-name">{dealer}</div>
-                    <div class="data-note">
-                        Sales <span style="color:{BRAND_RED_DARK};font-weight:800">●</span>
-                        &nbsp;&nbsp; Bike listings <span style="color:{ACCENT_RED};font-weight:800">●</span>
-                    </div>
-                </div>
+                <div class="dealer-name">{dealer}</div>
                 <div class="dealer-totals">
-                    <div><div class="dealer-total-label">Total Sales</div><div class="dealer-total-value">{total_sales:,.0f}</div></div>
-                    <div><div class="dealer-total-label">Bike Listings</div><div class="dealer-total-value">{total_listings:,.0f}</div></div>
+                    <div>
+                        <div class="dealer-total-label">Total Sales</div>
+                        <div class="dealer-total-value">{total_sales:,.0f}</div>
+                    </div>
+                    <div>
+                        <div class="dealer-total-label">Bike Listings</div>
+                        <div class="dealer-total-value">{total_listings:,.0f}</div>
+                    </div>
                 </div>
             </div>
             """,
             unsafe_allow_html=True,
         )
+
         chart = dealer_chart(plot_df)
         if chart is None:
             st.caption("No valid visit dates are available for this dealer.")
         else:
+            # Streamlit's element toolbar is hidden with CSS so the graph
+            # cannot accidentally be left in its data-table mode.
             st.altair_chart(chart, use_container_width=True)
+
+
+def set_navigation(view_id: str):
+    st.session_state["dashboard_view"] = view_id
+
+
+def render_sidebar(staff_members):
+    logo = logo_data_uri()
+
+    with st.sidebar:
+        if logo:
+            st.markdown(
+                f'<div class="sidebar-logo-wrap"><img src="{logo}" alt="Rider Gate logo"></div>',
+                unsafe_allow_html=True,
+            )
+
+        st.markdown(
+            '<div class="sidebar-label">DASHBOARD</div>',
+            unsafe_allow_html=True,
+        )
+
+        if "dashboard_view" not in st.session_state:
+            st.session_state["dashboard_view"] = "overview"
+
+        current = st.session_state["dashboard_view"]
+
+        if st.button(
+            "Overview",
+            key="nav_overview",
+            type="primary" if current == "overview" else "secondary",
+            icon=":material/home:",
+            use_container_width=True,
+        ):
+            set_navigation("overview")
+            st.rerun()
+
+        for person in staff_members:
+            view_id = person["id"]
+            if st.button(
+                person["name"],
+                key=f"nav_{view_id}",
+                type="primary" if current == view_id else "secondary",
+                icon=":material/account_box:",
+                use_container_width=True,
+            ):
+                set_navigation(view_id)
+                st.rerun()
+
+    return st.session_state["dashboard_view"]
 
 
 def dashboard():
@@ -561,90 +880,182 @@ def dashboard():
         st.error("Apps Script returned no configured staff members.")
         st.stop()
 
-    # Sidebar navigation
-    with st.sidebar:
-        if LOGO_PATH.exists():
-            st.image(str(LOGO_PATH), use_container_width=True)
-        st.markdown('<div class="sidebar-label">DASHBOARD</div>', unsafe_allow_html=True)
-        choices = ["overview"] + [p["id"] for p in staff_members]
-        labels = {"overview": "Overview"}
-        labels.update({p["id"]: p["name"] for p in staff_members})
-        selected_view = st.radio(
-            "Navigation",
-            choices,
-            format_func=lambda x: labels[x],
-            label_visibility="collapsed",
-            key="dashboard_nav",
-        )
+    selected_view = render_sidebar(staff_members)
 
-    # Top bar
-    person = next((p for p in staff_members if p["id"] == selected_view), None)
-    title = "Performance Overview" if selected_view == "overview" else person["name"]
+    # Guard against a staff member being removed from Apps Script while
+    # still being selected in the user's browser session.
+    valid_views = {"overview"} | {p["id"] for p in staff_members}
+    if selected_view not in valid_views:
+        selected_view = "overview"
+        st.session_state["dashboard_view"] = "overview"
+
+    person = next(
+        (p for p in staff_members if p["id"] == selected_view),
+        None,
+    )
+
+    title = (
+        "Performance Overview"
+        if selected_view == "overview"
+        else person["name"]
+    )
+
     subtitle = (
         "Combined staff and dealer performance"
         if selected_view == "overview"
         else "Individual dealer visit and sales performance"
     )
 
-    t1, t2, t3, t4 = st.columns([6.1, 1.65, 1.6, 1.3], vertical_alignment="center")
+    t1, t2, t3, t4 = st.columns(
+        [6.2, 1.6, 1.55, 1.25],
+        vertical_alignment="center",
+    )
+
     with t1:
-        st.markdown(f"<h1 style='font-size:30px;margin:0'>{title}</h1>", unsafe_allow_html=True)
-        st.markdown(f'<div class="top-subtitle">{subtitle}</div>', unsafe_allow_html=True)
+        st.markdown(
+            f"<h1 style='font-size:30px;margin:0'>{title}</h1>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f'<div class="top-subtitle">{subtitle}</div>',
+            unsafe_allow_html=True,
+        )
+
     with t2:
-        sync_time = datetime.now(ZoneInfo("Asia/Kuala_Lumpur")).strftime("%I:%M %p").lstrip("0").lower()
-        st.markdown(f'<div class="sync-text">Synced {sync_time}</div>', unsafe_allow_html=True)
+        sync_time = (
+            datetime.now(ZoneInfo("Asia/Kuala_Lumpur"))
+            .strftime("%I:%M %p")
+            .lstrip("0")
+            .lower()
+        )
+        st.markdown(
+            f'<div class="sync-text">Synced {sync_time}</div>',
+            unsafe_allow_html=True,
+        )
+
     with t3:
-        if st.button("Refresh data", use_container_width=True, key="refresh_data"):
+        if st.button(
+            "Refresh data",
+            use_container_width=True,
+            key="refresh_data",
+            icon=":material/refresh:",
+        ):
             st.cache_data.clear()
             st.rerun()
+
     with t4:
-        if st.button("Log out", use_container_width=True, key="logout"):
+        if st.button(
+            "Log out",
+            use_container_width=True,
+            key="logout",
+            icon=":material/logout:",
+        ):
             st.session_state["authenticated"] = False
-            st.session_state.pop("dashboard_nav", None)
+            st.session_state.pop("dashboard_view", None)
             st.rerun()
 
-    relevant_errors = errors if selected_view == "overview" else [e for e in errors if e[0] == selected_view]
-    for _, staff_name, error in relevant_errors:
-        st.warning(f"{staff_name}: {error}")
+    relevant_errors = (
+        errors
+        if selected_view == "overview"
+        else [
+            e for e in errors
+            if e.get("staffId") == selected_view
+        ]
+    )
+
+    for err in relevant_errors:
+        if isinstance(err, dict):
+            staff_name = err.get("staffName", "Staff")
+            message = err.get("error", "Unknown data error.")
+        else:
+            # Compatibility with older payload shapes.
+            try:
+                _, staff_name, message = err
+            except Exception:
+                staff_name, message = "Staff", str(err)
+        st.warning(f"{staff_name}: {message}")
 
     view_df = data.copy()
     if selected_view != "overview":
-        view_df = view_df[view_df["Staff ID"] == selected_view].copy()
+        view_df = view_df[
+            view_df["Staff ID"] == selected_view
+        ].copy()
 
     # Filters
-    st.markdown('<div class="section-title">Filters</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="section-title">Filters</div>',
+        unsafe_allow_html=True,
+    )
+
     f1, f2, f3 = st.columns([1, 1, 2])
+
     valid_dates = view_df["Date Parsed"].dropna()
-    min_date = valid_dates.min().date() if not valid_dates.empty else None
-    max_date = valid_dates.max().date() if not valid_dates.empty else None
+    min_date = (
+        valid_dates.min().date()
+        if not valid_dates.empty
+        else None
+    )
+    max_date = (
+        valid_dates.max().date()
+        if not valid_dates.empty
+        else None
+    )
 
     with f1:
-        date_from = st.date_input("From date", value=min_date, key=f"from_{selected_view}")
+        date_from = st.date_input(
+            "From date",
+            value=min_date,
+            key=f"from_{selected_view}",
+        )
+
     with f2:
-        date_to = st.date_input("To date", value=max_date, key=f"to_{selected_view}")
+        date_to = st.date_input(
+            "To date",
+            value=max_date,
+            key=f"to_{selected_view}",
+        )
+
     with f3:
         dealer_search = st.text_input(
-            "Dealer search", placeholder="Search dealer name", key=f"search_{selected_view}"
+            "Dealer search",
+            placeholder="Search dealer name",
+            key=f"search_{selected_view}",
         )
 
     filtered = view_df.copy()
-    if date_from is not None and "Date Parsed" in filtered:
+
+    if date_from is not None:
         filtered = filtered[
-            filtered["Date Parsed"].isna() | (filtered["Date Parsed"].dt.date >= date_from)
+            filtered["Date Parsed"].isna()
+            | (filtered["Date Parsed"].dt.date >= date_from)
         ]
-    if date_to is not None and "Date Parsed" in filtered:
+
+    if date_to is not None:
         filtered = filtered[
-            filtered["Date Parsed"].isna() | (filtered["Date Parsed"].dt.date <= date_to)
+            filtered["Date Parsed"].isna()
+            | (filtered["Date Parsed"].dt.date <= date_to)
         ]
+
     if dealer_search.strip() and not filtered.empty:
         filtered = filtered[
-            filtered["Dealer Name"].str.contains(dealer_search.strip(), case=False, na=False)
+            filtered["Dealer Name"].str.contains(
+                dealer_search.strip(),
+                case=False,
+                na=False,
+            )
         ]
 
-    st.markdown('<div class="section-title">Performance Summary</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="section-title">Performance Summary</div>',
+        unsafe_allow_html=True,
+    )
     render_kpis(filtered)
 
-    st.markdown('<div class="section-title">Dealer Performance Summary</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="section-title">Dealer Performance Summary</div>',
+        unsafe_allow_html=True,
+    )
+
     if filtered.empty:
         st.info("No records match the current filters.")
     else:
@@ -657,30 +1068,67 @@ def dashboard():
                     "Bike Listing": ("Bike Listing", "sum"),
                 }
             )
-            .sort_values(["No. of Sales", "Bike Listing", "Dealer Name"], ascending=[False, False, True])
+            .sort_values(
+                ["No. of Sales", "Bike Listing", "Dealer Name"],
+                ascending=[False, False, True],
+            )
+            .reset_index(drop=True)
         )
+
+        # Explicit 1-based row numbering.
+        summary.insert(0, "No.", range(1, len(summary) + 1))
+
         st.dataframe(
             summary,
             use_container_width=True,
             hide_index=True,
             column_config={
-                "Dealer Name": st.column_config.TextColumn("Dealer Name"),
-                "No. of Visits": st.column_config.NumberColumn("No. of Visits", format="%d"),
-                "No. of Sales": st.column_config.NumberColumn("No. of Sales", format="%.0f"),
-                "Bike Listing": st.column_config.NumberColumn("Bike Listing", format="%.0f"),
+                "No.": st.column_config.NumberColumn(
+                    "No.",
+                    format="%d",
+                    width="small",
+                ),
+                "Dealer Name": st.column_config.TextColumn(
+                    "Dealer Name"
+                ),
+                "No. of Visits": st.column_config.NumberColumn(
+                    "No. of Visits",
+                    format="%d",
+                ),
+                "No. of Sales": st.column_config.NumberColumn(
+                    "No. of Sales",
+                    format="%.0f",
+                ),
+                "Bike Listing": st.column_config.NumberColumn(
+                    "Bike Listing",
+                    format="%.0f",
+                ),
             },
         )
 
-    st.markdown('<div class="section-title">Dealer Trends</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="section-title">Dealer Trends</div>',
+        unsafe_allow_html=True,
+    )
+
     if filtered.empty:
         st.info("No dealer trend data to display.")
     else:
-        dealers = sorted(filtered["Dealer Name"].dropna().unique(), key=str.lower)
+        dealers = sorted(
+            filtered["Dealer Name"].dropna().unique(),
+            key=str.lower,
+        )
+
         for i in range(0, len(dealers), 2):
             cols = st.columns(2)
-            for j, dealer in enumerate(dealers[i : i + 2]):
+            for j, dealer in enumerate(dealers[i:i + 2]):
                 with cols[j]:
-                    render_dealer_card(dealer, filtered[filtered["Dealer Name"] == dealer].copy())
+                    render_dealer_card(
+                        dealer,
+                        filtered[
+                            filtered["Dealer Name"] == dealer
+                        ].copy(),
+                    )
 
 
 if not is_authenticated():

@@ -1,44 +1,53 @@
-# Rider Gate Staff Performance Dashboard - Streamlit + Apps Script (V4)
+# Rider Gate Staff Performance Dashboard V5 - Streamlit + Apps Script
 
-This version uses Google Apps Script as the private data bridge between the Streamlit dashboard and the staff Google Sheets.
+V5 addresses the latest interface corrections.
 
-## Architecture
+## Changes in V5
 
-Private Google Sheets -> Google Apps Script Web App -> Streamlit Dashboard
+- Login screen rebuilt as a true full-height split screen.
+- Dashboard content expands to the full available width when the sidebar is collapsed.
+- Rider Gate logo is rendered as normal HTML, so it no longer has a fullscreen/expand control.
+- Sidebar navigation uses real buttons instead of radio buttons.
+- Overview uses a home icon and staff use account/user icons.
+- Streamlit element toolbars are hidden, removing the graph-to-table/fullscreen controls.
+- Dealer graph now displays Bike Listings only as the visible red shaded trend.
+- Hover still shows Date, Sales and Bike Listings.
+- Removed the Sales/Bike Listings colour legend because two visible trend lines are no longer used.
+- Removed helper fields such as "Sales Tooltip" and "Listings Tooltip".
+- Dealer Performance Summary has a visible row number starting at 1.
+- Malaysia timezone remains Asia/Kuala_Lumpur.
+- Apps Script API setup is unchanged.
 
-The Sheets can remain **Restricted**. The Apps Script Web App executes as the Google account that owns/has access to the sheets. Streamlit sends a secret API token to Apps Script, so a person who discovers the Web App URL cannot retrieve dashboard data without the token.
+## Update GitHub from CMD
 
-## Files
+Replace the old project files with the V5 files, keeping your existing `.git` folder.
 
-- `app.py` — Streamlit dashboard
-- `apps-script/Code.gs` — paste this into Google Apps Script
-- `.streamlit/secrets.example.toml` — example Streamlit Secrets
-- `requirements.txt` — Python packages
-- `assets/rider_gate_logo.png` — dashboard logo
+Then run:
 
-## GitHub
+```cmd
+git add .
+git commit -m "Update staff dashboard interface V5"
+git push
+```
 
-Do not commit `.streamlit/secrets.toml`.
+Streamlit should redeploy automatically.
+
+## Apps Script
+
+No Apps Script redeployment is required for these interface changes.
+The included `apps-script/Code.gs` is the same API approach as before.
 
 ## Streamlit Secrets
 
-Use:
+Your existing secrets remain:
 
 ```toml
 [app]
-password = "YOUR-DASHBOARD-PASSWORD"
+password = "YOUR_PASSWORD"
 
 [data_api]
-url = "https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec"
-token = "THE-SAME-API-TOKEN-AS-IN-APPS-SCRIPT"
+url = "YOUR_APPS_SCRIPT_EXEC_URL"
+token = "YOUR_API_TOKEN"
 ```
 
-
-## V4 interface fixes
-
-- Full-screen split login page and the word "Live" removed.
-- Rider Gate sidebar restyled to match the earlier dashboard, with radio circles hidden and staff shown with account icons.
-- Dealer trend cards use a solid Rider Gate red line plus shaded area instead of the plain dotted presentation.
-- Hover details always include date, sales and bike listings; missing numeric values are normalised to 0 instead of displaying NaN.
-- Synced time uses Malaysia time (Asia/Kuala_Lumpur).
-- Refresh data and Log out buttons have more room so their labels do not truncate.
+Do not commit real secrets to GitHub.
