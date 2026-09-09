@@ -5,10 +5,9 @@ from datetime import datetime
 from pathlib import Path
 
 import altair as alt
-import gspread
+import requests
 import pandas as pd
 import streamlit as st
-from google.oauth2.service_account import Credentials
 from streamlit_autorefresh import st_autorefresh
 
 st.set_page_config(
@@ -248,104 +247,50 @@ def detect_header_row(matrix):
     return None, None
 
 
-def staff_configuration():
+def data_api_configuration():
     try:
-        staff_secrets = st.secrets["staff"]
+        cfg = st.secrets["data_api"]
+        url = str(cfg["url"]).strip()
+        token = str(cfg["token"]).strip()
+        if not url or not token:
+            return None
+        return {"url": url, "token": token}
     except Exception:
-        return []
-
-    people = []
-    for n in range(1, 51):
-        name_key = f"person_{n}_name"
-        sheet_key = f"person_{n}_sheet_id"
-        if name_key in staff_secrets and sheet_key in staff_secrets:
-            name = str(staff_secrets[name_key]).strip()
-            sheet_id = str(staff_secrets[sheet_key]).strip()
-            if name and sheet_id:
-                people.append({"id": f"person-{n}", "name": name, "sheet_id": sheet_id})
-    return people
-
-
-@st.cache_resource(show_spinner=False)
-def google_client():
-    scopes = [
-        "https://www.googleapis.com/auth/spreadsheets.readonly",
-        "https://www.googleapis.com/auth/drive.readonly",
-    ]
-    info = dict(st.secrets["google_service_account"])
-    credentials = Credentials.from_service_account_info(info, scopes=scopes)
-    return gspread.authorize(credentials)
+        return None
 
 
 @st.cache_data(ttl=55, show_spinner=False)
-def load_staff_sheet(staff_id, staff_name, sheet_id):
-    gc = google_client()
-    spreadsheet = gc.open_by_key(sheet_id)
-    worksheet = spreadsheet.get_worksheet(0)
-    matrix = worksheet.get_all_values()
+def load_all_data():
+    cfg = data_api_configuration()
+    if not cfg:
+        raise RuntimeError("Apps Script data API is not configured in Streamlit Secrets.")
 
-    if not matrix:
-        return pd.DataFrame()
-
-    header_row, mapping = detect_header_row(matrix)
-    if mapping is None:
-        raise ValueError(
-            "Could not find the required headers: Date of Visit, Dealer Name, Bike Listing and No. of Sales."
+    try:
+        response = requests.post(
+            cfg["url"],
+            json={"token": cfg["token"]},
+            timeout=30,
+            allow_redirects=True,
+            headers={"User-Agent": "RiderGate-Streamlit-Dashboard/1.0"},
         )
+    except requests.RequestException as exc:
+        raise RuntimeError(f"Could not reach the Apps Script data API: {exc}") from exc
 
-    records = []
-    for row in matrix[header_row + 1 :]:
-        def pick(col):
-            idx = mapping[col]
-            return str(row[idx]).strip() if idx < len(row) else ""
+    if not response.ok:
+        raise RuntimeError(f"Apps Script returned HTTP {response.status_code}.")
 
-        date = pick("Date of Visit")
-        dealer = pick("Dealer Name")
-        listing = pick("Bike Listing")
-        sales = pick("No. of Sales")
-        if not any([date, dealer, listing, sales]) or not dealer:
-            continue
-        records.append(
-            {
-                "Date of Visit": date,
-                "Dealer Name": dealer,
-                "Bike Listing": listing,
-                "No. of Sales": sales,
-            }
-        )
+    try:
+        payload = response.json()
+    except ValueError as exc:
+        preview = response.text[:180].replace("\n", " ")
+        raise RuntimeError(f"Apps Script did not return JSON. Response started with: {preview}") from exc
 
-    data = pd.DataFrame(records)
-    if data.empty:
-        return data
+    if not payload.get("ok"):
+        raise RuntimeError(payload.get("error") or "Apps Script returned an unknown error.")
 
-    for col in ["Bike Listing", "No. of Sales"]:
-        extracted = (
-            data[col]
-            .astype(str)
-            .str.replace(",", "", regex=False)
-            .str.extract(r"(-?\d+(?:\.\d+)?)")[0]
-        )
-        data[col] = pd.to_numeric(extracted, errors="coerce").fillna(0)
-
-    data["Date Parsed"] = pd.to_datetime(data["Date of Visit"], errors="coerce", dayfirst=True)
-    data["Staff ID"] = staff_id
-    data["Staff Name"] = staff_name
-    return data
-
-
-def load_all_data(staff_members):
-    frames = []
-    errors = []
-    for person in staff_members:
-        try:
-            df = load_staff_sheet(person["id"], person["name"], person["sheet_id"])
-            if not df.empty:
-                frames.append(df)
-        except Exception as exc:
-            errors.append((person["id"], person["name"], str(exc)))
-
-    if frames:
-        return pd.concat(frames, ignore_index=True), errors
+    staff_members = payload.get("staff", [])
+    rows = payload.get("rows", [])
+    errors = payload.get("errors", [])
 
     columns = [
         "Date of Visit",
@@ -356,8 +301,33 @@ def load_all_data(staff_members):
         "Staff ID",
         "Staff Name",
     ]
-    return pd.DataFrame(columns=columns), errors
 
+    if not rows:
+        return pd.DataFrame(columns=columns), staff_members, errors
+
+    data = pd.DataFrame(rows)
+    rename = {
+        "date": "Date of Visit",
+        "dealer": "Dealer Name",
+        "bikeListing": "Bike Listing",
+        "sales": "No. of Sales",
+        "staffId": "Staff ID",
+        "staffName": "Staff Name",
+    }
+    data = data.rename(columns=rename)
+
+    for col in ["Date of Visit", "Dealer Name", "Staff ID", "Staff Name"]:
+        if col not in data:
+            data[col] = ""
+        data[col] = data[col].fillna("").astype(str).str.strip()
+
+    for col in ["Bike Listing", "No. of Sales"]:
+        if col not in data:
+            data[col] = 0
+        data[col] = pd.to_numeric(data[col], errors="coerce").fillna(0)
+
+    data["Date Parsed"] = pd.to_datetime(data["Date of Visit"], errors="coerce", dayfirst=True)
+    return data[columns], staff_members, errors
 
 def render_kpis(df):
     visits = len(df)
@@ -489,9 +459,15 @@ def dashboard():
     inject_dashboard_css()
     st_autorefresh(interval=60_000, key="staff_dashboard_auto_refresh")
 
-    staff_members = staff_configuration()
+    try:
+        data, staff_members, errors = load_all_data()
+    except Exception as exc:
+        st.error(str(exc))
+        st.info("Check the Apps Script deployment URL and API token in Streamlit Secrets.")
+        st.stop()
+
     if not staff_members:
-        st.error("No staff Google Sheets are configured in Streamlit Secrets.")
+        st.error("Apps Script returned no configured staff members.")
         st.stop()
 
     # Sidebar navigation
@@ -510,11 +486,9 @@ def dashboard():
             key="dashboard_nav",
         )
         st.markdown(
-            '<div class="privacy-note">Private Google Sheets are read through a restricted Google service account. Sheet IDs and credentials are not stored in the GitHub code.</div>',
+            '<div class="privacy-note">Private Google Sheets are read through a protected Google Apps Script API. Sheet IDs and the API token are not stored in the public GitHub code.</div>',
             unsafe_allow_html=True,
         )
-
-    data, errors = load_all_data(staff_members)
 
     # Top bar
     person = next((p for p in staff_members if p["id"] == selected_view), None)
