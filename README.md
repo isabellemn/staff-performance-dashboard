@@ -1,4 +1,4 @@
-# Rider Gate Staff Performance Dashboard — Streamlit + Apps Script
+# Rider Gate Staff Performance Dashboard - Streamlit + Apps Script (V4)
 
 This version uses Google Apps Script as the private data bridge between the Streamlit dashboard and the staff Google Sheets.
 
@@ -32,3 +32,13 @@ password = "YOUR-DASHBOARD-PASSWORD"
 url = "https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec"
 token = "THE-SAME-API-TOKEN-AS-IN-APPS-SCRIPT"
 ```
+
+
+## V4 interface fixes
+
+- Full-screen split login page and the word "Live" removed.
+- Rider Gate sidebar restyled to match the earlier dashboard, with radio circles hidden and staff shown with account icons.
+- Dealer trend cards use a solid Rider Gate red line plus shaded area instead of the plain dotted presentation.
+- Hover details always include date, sales and bike listings; missing numeric values are normalised to 0 instead of displaying NaN.
+- Synced time uses Malaysia time (Asia/Kuala_Lumpur).
+- Refresh data and Log out buttons have more room so their labels do not truncate.

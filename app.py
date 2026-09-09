@@ -2,6 +2,7 @@ import base64
 import hmac
 import re
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from pathlib import Path
 
 import altair as alt
@@ -11,8 +12,8 @@ import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 
 st.set_page_config(
-    page_title="Rider Gate Live Performance Dashboard",
-    page_icon="📊",
+    page_title="Rider Gate DM Performance Dashboard",
+    page_icon="👤",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -61,37 +62,79 @@ def inject_login_css():
     st.markdown(
         f"""
         <style>
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400,0,0&display=swap');
         html, body, [class*="css"] {{font-family:'Poppins', sans-serif;}}
         .stApp {{background:#FFFFFF;}}
         section[data-testid="stSidebar"] {{display:none !important;}}
-        .block-container {{max-width:1180px; padding-top:5.5rem; padding-bottom:3rem;}}
-        .login-panel {{
-            min-height:510px;
-            border-radius:3px;
-            padding:44px 42px;
+        .block-container {{max-width:none !important; padding:0 !important;}}
+
+        /* Full-screen split login, matching the Rider Gate dashboard reference. */
+        div[data-testid="stHorizontalBlock"]:has(.login-panel) {{
+            gap:0 !important;
+            min-height:100vh;
+            align-items:stretch !important;
+        }}
+        div[data-testid="stHorizontalBlock"]:has(.login-panel) > div[data-testid="stColumn"] {{
+            min-height:100vh;
+        }}
+        div[data-testid="stHorizontalBlock"]:has(.login-panel) > div[data-testid="stColumn"]:first-child {{
             background:linear-gradient(145deg, {BRAND_RED} 0%, {BRAND_RED_DARK} 100%);
+        }}
+        div[data-testid="stHorizontalBlock"]:has(.login-panel) > div[data-testid="stColumn"]:nth-child(2) {{
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            background:#fff;
+        }}
+        div[data-testid="stHorizontalBlock"]:has(.login-panel) > div[data-testid="stColumn"]:nth-child(2) > div {{
+            width:min(520px, 76%);
+        }}
+        .login-panel {{
+            min-height:100vh;
+            padding:clamp(48px,7vw,100px);
             color:white;
-            box-shadow:0 15px 45px rgba(152,37,30,.12);
             display:flex;
             flex-direction:column;
             justify-content:center;
         }}
-        .login-panel img {{width:132px; border-radius:13px; margin-bottom:38px;}}
-        .login-panel h1 {{font-size:31px;line-height:1.18;margin:0 0 18px;font-weight:800;letter-spacing:-1.1px;}}
-        .login-panel p {{font-size:12px;line-height:1.8;opacity:.86;max-width:430px;margin:0;}}
-        .login-form-title {{font-size:22px;font-weight:750;color:{INK};margin-top:90px;margin-bottom:20px;}}
+        .login-panel img {{
+            width:142px;
+            border-radius:15px;
+            margin-bottom:46px;
+            box-shadow:0 9px 22px rgba(94,15,11,.18);
+        }}
+        .login-panel h1 {{
+            font-size:clamp(30px,3vw,46px);
+            line-height:1.12;
+            margin:0 0 20px;
+            font-weight:800;
+            letter-spacing:-1.4px;
+            max-width:560px;
+        }}
+        .login-panel p {{
+            font-size:13px;
+            line-height:1.85;
+            opacity:.88;
+            max-width:520px;
+            margin:0;
+        }}
+        .login-form-title {{font-size:24px;font-weight:750;color:{INK};margin:0 0 24px;}}
         div[data-testid="stTextInput"] label p {{font-size:12px;font-weight:600;color:{MUTED};}}
-        div[data-testid="stTextInput"] input {{border-radius:7px;border:1px solid #C9CED7;min-height:44px;}}
+        div[data-testid="stTextInput"] input {{
+            border-radius:8px;border:1px solid #C9CED7;min-height:46px;background:#fff;
+        }}
         div[data-testid="stFormSubmitButton"] button {{
-            width:100%;background:{BRAND_RED};color:#fff;border:0;border-radius:7px;min-height:44px;font-weight:650;
+            width:100%;background:{BRAND_RED};color:#fff;border:0;border-radius:8px;min-height:46px;font-weight:700;
         }}
         div[data-testid="stFormSubmitButton"] button:hover {{background:{BRAND_RED_DARK};color:#fff;border:0;}}
-        .login-hint {{color:{MUTED};font-size:11px;margin-top:14px;}}
+        .login-hint {{color:{MUTED};font-size:11px;margin-top:15px;}}
         @media(max-width:800px) {{
-            .block-container {{padding-top:2rem;}}
-            .login-panel {{min-height:auto;padding:32px 28px;}}
-            .login-form-title {{margin-top:15px;}}
+            div[data-testid="stHorizontalBlock"]:has(.login-panel) {{display:block !important;}}
+            div[data-testid="stHorizontalBlock"]:has(.login-panel) > div[data-testid="stColumn"] {{min-height:auto; width:100% !important;}}
+            .login-panel {{min-height:42vh;padding:36px 28px;}}
+            .login-panel img {{width:105px;margin-bottom:25px;}}
+            div[data-testid="stHorizontalBlock"]:has(.login-panel) > div[data-testid="stColumn"]:nth-child(2) {{min-height:58vh;padding:34px 0;}}
+            div[data-testid="stHorizontalBlock"]:has(.login-panel) > div[data-testid="stColumn"]:nth-child(2) > div {{width:84%;}}
         }}
         </style>
         """,
@@ -103,32 +146,59 @@ def inject_dashboard_css():
     st.markdown(
         f"""
         <style>
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400,0,0&display=swap');
         html, body, [class*="css"] {{font-family:'Poppins', sans-serif;}}
         .stApp {{background:{LIGHT_BG};}}
         .block-container {{padding-top:1.45rem;padding-bottom:3rem;max-width:1550px;}}
 
+        /* Rider Gate sidebar - no Streamlit radio circles. */
         section[data-testid="stSidebar"] {{
             background:linear-gradient(180deg,{BRAND_RED} 0%, {BRAND_RED_DARK} 100%);
             border-right:0;
+            min-width:270px !important;
+            max-width:270px !important;
         }}
-        section[data-testid="stSidebar"] > div {{padding-top:1.7rem;}}
+        section[data-testid="stSidebar"] > div {{padding-top:1.3rem;}}
         section[data-testid="stSidebar"] img {{
-            display:block;margin:0 auto 1.3rem auto;max-width:215px;border-radius:22px;
+            display:block;margin:1.25rem auto 2.2rem auto;max-width:205px;border-radius:22px;
+            box-shadow:0 8px 24px rgba(84,17,13,.14);
         }}
-        section[data-testid="stSidebar"] .stMarkdown p,
-        section[data-testid="stSidebar"] label {{color:white !important;}}
-        section[data-testid="stSidebar"] div[role="radiogroup"] {{gap:.42rem;}}
-        section[data-testid="stSidebar"] div[role="radiogroup"] label {{
-            padding:.76rem .9rem;border-radius:12px;transition:.15s ease;font-weight:650;
-        }}
-        section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {{background:rgba(255,255,255,.10);}}
-        section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {{background:rgba(255,255,255,.19);}}
-        section[data-testid="stSidebar"] div[role="radiogroup"] label p {{font-size:14px !important;}}
         section[data-testid="stSidebar"] [data-testid="stSidebarCollapseButton"] button {{
-            background:#fff;color:{BRAND_RED};border-radius:999px;
+            background:#fff !important;color:{BRAND_RED} !important;border-radius:999px !important;
+            width:42px;height:42px;border:0 !important;box-shadow:0 5px 15px rgba(55,15,12,.12);
         }}
-        .sidebar-label {{font-size:10px;letter-spacing:.14em;color:rgba(255,255,255,.62);font-weight:700;margin:1rem .25rem .45rem;}}
+        .sidebar-label {{
+            font-size:10px;letter-spacing:.15em;color:rgba(255,255,255,.70);font-weight:700;
+            margin:0 .8rem .55rem;text-transform:uppercase;
+        }}
+        section[data-testid="stSidebar"] div[role="radiogroup"] {{gap:.44rem;padding:0 .62rem;}}
+        section[data-testid="stSidebar"] div[role="radiogroup"] label {{
+            padding:.78rem .85rem !important;
+            border-radius:12px !important;
+            transition:.15s ease;
+            font-weight:650 !important;
+            background:transparent;
+            min-height:48px;
+        }}
+        section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {{background:rgba(255,255,255,.09);}}
+        section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {{background:rgba(255,255,255,.20);}}
+        section[data-testid="stSidebar"] div[role="radiogroup"] label > div:first-child {{display:none !important;}}
+        section[data-testid="stSidebar"] div[role="radiogroup"] label p,
+        section[data-testid="stSidebar"] div[role="radiogroup"] label span,
+        section[data-testid="stSidebar"] div[role="radiogroup"] label * {{
+            color:#fff !important;
+            font-family:'Poppins',sans-serif !important;
+            font-size:14px !important;
+        }}
+        section[data-testid="stSidebar"] div[role="radiogroup"] label p::before {{
+            font-family:'Material Symbols Rounded' !important;
+            font-size:20px !important;
+            font-weight:400 !important;
+            vertical-align:-4px;
+            margin-right:11px;
+            content:'account_box';
+        }}
+        section[data-testid="stSidebar"] div[role="radiogroup"] label:first-child p::before {{content:'home';}}
 
         h1,h2,h3,p,span,label,button,input {{font-family:'Poppins', sans-serif;}}
         h1 {{color:{INK};letter-spacing:-.8px;}}
@@ -138,7 +208,7 @@ def inject_dashboard_css():
 
         div[data-testid="stButton"] button {{
             background:#fff;color:{INK};border:1px solid #E1E5EB;border-radius:12px;min-height:42px;
-            font-weight:650;box-shadow:0 2px 8px rgba(32,41,56,.03);
+            font-weight:650;box-shadow:0 2px 8px rgba(32,41,56,.03);white-space:nowrap;font-size:12px;
         }}
         div[data-testid="stButton"] button:hover {{border-color:#CDD2DA;color:{BRAND_RED};background:#fff;}}
 
@@ -152,20 +222,22 @@ def inject_dashboard_css():
 
         .section-title {{font-size:17px;font-weight:750;color:{INK};margin:1.2rem 0 .65rem;}}
         .dealer-header {{display:flex;justify-content:space-between;align-items:flex-start;gap:15px;margin-bottom:0;}}
-        .dealer-name {{font-size:13px;font-weight:650;color:#5F6878;}}
+        .dealer-name {{font-size:13px;font-weight:700;color:#5F6878;}}
         .dealer-totals {{display:flex;gap:14px;text-align:right;}}
         .dealer-total-label {{font-size:8px;text-transform:uppercase;letter-spacing:.05em;color:#A0A7B2;}}
-        .dealer-total-value {{font-size:15px;font-weight:800;color:{ACCENT_RED};line-height:1.2;}}
+        .dealer-total-value {{font-size:16px;font-weight:800;color:{ACCENT_RED};line-height:1.2;}}
         div[data-testid="stVerticalBlockBorderWrapper"] {{
-            border:1px solid #E8EBF0 !important;border-radius:16px !important;background:#fff !important;
-            box-shadow:0 8px 25px rgba(32,41,56,.035);
+            border:1px solid #E8EBF0 !important;border-radius:16px !important;
+            background:
+                linear-gradient(rgba(255,255,255,.96),rgba(255,255,255,.96)),
+                repeating-linear-gradient(135deg,#F1F3F6 0,#F1F3F6 1px,transparent 1px,transparent 13px) !important;
+            box-shadow:0 8px 25px rgba(32,41,56,.04);
         }}
         div[data-testid="stDataFrame"] {{border-radius:14px;overflow:hidden;border:1px solid #E7EAF0;}}
         div[data-testid="stDateInput"] input, div[data-testid="stTextInput"] input {{
             background:#fff;border-radius:10px;border:1px solid #DDE1E7;min-height:40px;
         }}
-        .data-note {{font-size:11px;color:{MUTED};}}
-        .privacy-note {{font-size:10px;color:rgba(255,255,255,.64);line-height:1.6;margin-top:1.3rem;}}
+        .data-note {{font-size:10px;color:{MUTED};margin-top:2px;}}
         </style>
         """,
         unsafe_allow_html=True,
@@ -195,8 +267,8 @@ def login_screen():
             f"""
             <div class="login-panel">
                 {img_html}
-                <h1>Rider Gate Live<br>Performance Dashboard</h1>
-                <p>Access the Rider Gate performance dashboard for current operational, staff and dealer-management reporting.</p>
+                <h1>Rider Gate Staff<br>Performance Dashboard</h1>
+                <p>Access dealer visits, bike listings and sales performance across Rider Gate staff and dealers in one secure dashboard.</p>
             </div>
             """,
             unsafe_allow_html=True,
@@ -359,6 +431,12 @@ def dealer_chart(plot_df):
     if plot_df.empty:
         return None
 
+    plot_df = plot_df.copy()
+    plot_df["No. of Sales"] = pd.to_numeric(plot_df["No. of Sales"], errors="coerce").fillna(0.0)
+    plot_df["Bike Listing"] = pd.to_numeric(plot_df["Bike Listing"], errors="coerce").fillna(0.0)
+    plot_df["Sales Tooltip"] = plot_df["No. of Sales"].map(lambda v: f"{v:,.0f}")
+    plot_df["Listings Tooltip"] = plot_df["Bike Listing"].map(lambda v: f"{v:,.0f}")
+
     base = alt.Chart(plot_df).encode(
         x=alt.X(
             "Date Parsed:T",
@@ -369,39 +447,43 @@ def dealer_chart(plot_df):
 
     tooltip = [
         alt.Tooltip("Date Parsed:T", title="Date", format="%d %b %Y"),
-        alt.Tooltip("No. of Sales:Q", title="Sales", format=",.0f"),
-        alt.Tooltip("Bike Listing:Q", title="Bike listings", format=",.0f"),
+        alt.Tooltip("Sales Tooltip:N", title="Sales"),
+        alt.Tooltip("Listings Tooltip:N", title="Bike listings"),
     ]
 
-    sales_area = base.mark_area(
+    # Bike listings form the main shaded trend so the card keeps the strong red visual
+    # shown in the Rider Gate reference even when sales numbers are much smaller.
+    listing_area = base.mark_area(
         color=ACCENT_RED,
-        opacity=0.10,
+        opacity=0.13,
         interpolate="linear",
-    ).encode(y=alt.Y("No. of Sales:Q", title=None))
-
-    sales_line = base.mark_line(
-        color=ACCENT_RED,
-        strokeWidth=2.7,
-        point=alt.OverlayMarkDef(filled=True, color=ACCENT_RED, size=42),
-    ).encode(
-        y=alt.Y("No. of Sales:Q", title=None),
-        tooltip=tooltip,
-    )
-
-    listing_line = base.mark_line(
-        color=LISTING_COLOUR,
-        strokeWidth=1.8,
-        strokeDash=[5, 4],
-        point=alt.OverlayMarkDef(filled=True, color=LISTING_COLOUR, size=30),
     ).encode(
         y=alt.Y("Bike Listing:Q", title=None),
         tooltip=tooltip,
     )
 
+    listing_line = base.mark_line(
+        color=ACCENT_RED,
+        strokeWidth=2.6,
+        point=alt.OverlayMarkDef(filled=True, color=ACCENT_RED, size=46),
+    ).encode(
+        y=alt.Y("Bike Listing:Q", title=None),
+        tooltip=tooltip,
+    )
+
+    sales_line = base.mark_line(
+        color=BRAND_RED_DARK,
+        strokeWidth=2.4,
+        point=alt.OverlayMarkDef(filled=True, color=BRAND_RED_DARK, size=44),
+    ).encode(
+        y=alt.Y("No. of Sales:Q", title=None),
+        tooltip=tooltip,
+    )
+
     chart = (
-        alt.layer(sales_area, sales_line, listing_line)
+        alt.layer(listing_area, listing_line, sales_line)
         .resolve_scale(y="shared")
-        .properties(height=225)
+        .properties(height=220)
         .configure_view(strokeOpacity=0)
         .configure_axis(
             labelFont="Poppins",
@@ -418,18 +500,24 @@ def dealer_chart(plot_df):
 
 
 def render_dealer_card(dealer, dealer_df):
+    dealer_df = dealer_df.copy()
+    dealer_df["No. of Sales"] = pd.to_numeric(dealer_df["No. of Sales"], errors="coerce").fillna(0.0)
+    dealer_df["Bike Listing"] = pd.to_numeric(dealer_df["Bike Listing"], errors="coerce").fillna(0.0)
+
     total_sales = dealer_df["No. of Sales"].sum()
     total_listings = dealer_df["Bike Listing"].sum()
 
     dated = dealer_df.dropna(subset=["Date Parsed"]).copy()
     if not dated.empty:
         plot_df = (
-            dated.groupby("Date Parsed", as_index=False)
-            .agg({"No. of Sales": "sum", "Bike Listing": "sum"})
+            dated.groupby("Date Parsed", as_index=False)[["No. of Sales", "Bike Listing"]]
+            .sum()
             .sort_values("Date Parsed")
         )
+        plot_df["No. of Sales"] = pd.to_numeric(plot_df["No. of Sales"], errors="coerce").fillna(0.0)
+        plot_df["Bike Listing"] = pd.to_numeric(plot_df["Bike Listing"], errors="coerce").fillna(0.0)
     else:
-        plot_df = pd.DataFrame()
+        plot_df = pd.DataFrame(columns=["Date Parsed", "No. of Sales", "Bike Listing"])
 
     with st.container(border=True):
         st.markdown(
@@ -437,7 +525,10 @@ def render_dealer_card(dealer, dealer_df):
             <div class="dealer-header">
                 <div>
                     <div class="dealer-name">{dealer}</div>
-                    <div class="data-note">Sales <span style="color:{ACCENT_RED};font-weight:700">●</span> &nbsp; Bike listings <span style="color:{LISTING_COLOUR};font-weight:700">●</span></div>
+                    <div class="data-note">
+                        Sales <span style="color:{BRAND_RED_DARK};font-weight:800">●</span>
+                        &nbsp;&nbsp; Bike listings <span style="color:{ACCENT_RED};font-weight:800">●</span>
+                    </div>
                 </div>
                 <div class="dealer-totals">
                     <div><div class="dealer-total-label">Total Sales</div><div class="dealer-total-value">{total_sales:,.0f}</div></div>
@@ -476,18 +567,14 @@ def dashboard():
             st.image(str(LOGO_PATH), use_container_width=True)
         st.markdown('<div class="sidebar-label">DASHBOARD</div>', unsafe_allow_html=True)
         choices = ["overview"] + [p["id"] for p in staff_members]
-        labels = {"overview": "⌂   Overview"}
-        labels.update({p["id"]: f"▣   {p['name']}" for p in staff_members})
+        labels = {"overview": "Overview"}
+        labels.update({p["id"]: p["name"] for p in staff_members})
         selected_view = st.radio(
             "Navigation",
             choices,
             format_func=lambda x: labels[x],
             label_visibility="collapsed",
             key="dashboard_nav",
-        )
-        st.markdown(
-            '<div class="privacy-note">Private Google Sheets are read through a protected Google Apps Script API. Sheet IDs and the API token are not stored in the public GitHub code.</div>',
-            unsafe_allow_html=True,
         )
 
     # Top bar
@@ -499,12 +586,12 @@ def dashboard():
         else "Individual dealer visit and sales performance"
     )
 
-    t1, t2, t3, t4 = st.columns([6.4, 1.7, 1.35, 1.05], vertical_alignment="center")
+    t1, t2, t3, t4 = st.columns([6.1, 1.65, 1.6, 1.3], vertical_alignment="center")
     with t1:
         st.markdown(f"<h1 style='font-size:30px;margin:0'>{title}</h1>", unsafe_allow_html=True)
         st.markdown(f'<div class="top-subtitle">{subtitle}</div>', unsafe_allow_html=True)
     with t2:
-        sync_time = datetime.now().astimezone().strftime("%I:%M %p").lstrip("0").lower()
+        sync_time = datetime.now(ZoneInfo("Asia/Kuala_Lumpur")).strftime("%I:%M %p").lstrip("0").lower()
         st.markdown(f'<div class="sync-text">Synced {sync_time}</div>', unsafe_allow_html=True)
     with t3:
         if st.button("Refresh data", use_container_width=True, key="refresh_data"):
